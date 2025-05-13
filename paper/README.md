@@ -17,7 +17,7 @@ If `args` is empty or `["save"]`, then all the functions will be executed (i.e. 
 
 The steps that follow assume you are in the `paper` directory and on Julia 1.11, and are given only for Windows. The first way to run the code is to simply do
 
-```powershell
+```julia
 PS C:\Users\User\.julia\dev\ArcPolynomials\paper> julia
                _
    _       _ _(_)_     |  Documentation: https://docs.julialang.org
@@ -55,7 +55,7 @@ julia>
 
 Alternatively, you can run the code directly from the command line without first entering the Julia REPL. In this form, the `args` are passed as command line arguments. For example, to run the code with all the figures saved and only with the linear Schrödinger and screened Poisson examples, you would run the following command (the equivalent in the first example above would be `main(["save", "linear_schrodinger", "screened_poisson"])`):
 
-```powershell
+```julia
 PS C:\Users\User\.julia\dev\ArcPolynomials\paper> julia main.jl save linear_schrodinger screened_poisson
 [ Info: [16:36:15]: Loading C:\Users\djv23\.julia\dev\ArcPolynomials\paper\main.jl
   Activating project at `C:\Users\djv23\.julia\dev\ArcPolynomials\paper`

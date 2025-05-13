@@ -31,7 +31,7 @@ Finally, we also implement:
 
 # Examples 
 
-```julia-repl
+```julia
 julia> # SemiclassicalJacobiArc
 
 julia> h, b = 0.5, -1.0
