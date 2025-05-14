@@ -76,6 +76,7 @@ _extended_bpbandwidths(C, i::Int) = _extended_bpbandwidths(C)[i]
 bandedpart(C::CyclicBandedMatrix) = _BandedMatrix(parent(C), axes(C, 1), _extended_bpbandwidths(C)...) # Note that this matrice's data is aliased to the original data
 bandedpart(C::Adjoint{<:Any,<:CyclicBandedMatrix}) = adjoint(bandedpart(parent(C)))
 bandedpart(C::Transpose{<:Any,<:CyclicBandedMatrix}) = transpose(bandedpart(parent(C)))
+bandedpart(C::AbstractVector) = C
 
 # axes
 _ncols(C::AbstractMatrix) = size(C, 2)

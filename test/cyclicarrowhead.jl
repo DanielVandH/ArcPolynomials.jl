@@ -377,8 +377,8 @@ end
     LD = L̃
     LF = LowerTriangular(CyclicBBB{Float64}(LA, LB, LC, LD.D))
     @test Matrix(LF') * Matrix(LF) ≈ Matrix(K)
-    @test L̃[Block(1, 1)] * M[1]' + L̃[Block(2, 1)] * M[2]' ≈ B[1]'
-    @test L̃[Block(1, 2)] * M[1]' + L̃[Block(2, 2)] * M[2]' ≈ B[2]'
+    @test Matrix(L̃[Block(1, 1)]) * Matrix(M[1])' + Matrix(L̃[Block(2, 1)]) * Matrix(M[2])' ≈ Matrix(B[1])'
+    @test Matrix(L̃[Block(1, 2)]) * Matrix(M[1])' + Matrix(L̃[Block(2, 2)]) * Matrix(M[2])' ≈ Matrix(B[2])'
 
     n = 4
     p = 10
