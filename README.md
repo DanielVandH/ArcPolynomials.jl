@@ -1,6 +1,6 @@
 # ArcPolynomials
 
-Implements the bases introduced in the paper _A sparse hp-finite element method for piecewise-smooth differential equations with periodic boundary conditions_ by Daniel VandenHeuvel and Sheehan Olver.
+Implements the bases introduced in the paper _A sparse hp-finite element method for piecewise-smooth differential equations with periodic boundary conditions_ (https://arxiv.org/abs/2505.17849) by Daniel VandenHeuvel and Sheehan Olver.
 
 The code used for producing the results in the paper is in the `paper/` directory, which includes a READMD file with instructions on how to run the code.
 
