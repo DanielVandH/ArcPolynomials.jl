@@ -1,4 +1,4 @@
-This folder contains the code used to generate the results in our paper _A sparse $hp$-finite element method for piecewise-smooth differential equations with periodic boundary conditions_ (https://arxiv.org/abs/2505.17849) by Daniel VandenHeuvel and Sheehan Olver. 
+This folder contains the code used to generate the results in our paper _A sparse hp-finite element method for piecewise-smooth differential equations with periodic boundary conditions_ (https://arxiv.org/abs/2505.17849) by Daniel VandenHeuvel and Sheehan Olver. 
 
 The code is given in `main.jl`. This script defines all the functions that produce the results and then finally runs a `main(args)` function that executes the code. The `args` argument should be a vector of strings that each specify the parameters for the run, namely:
 - `"save"`: Include this argument to save the figures to the `paper/figures/` directory. If not included, the figures will be displayed but not saved.
