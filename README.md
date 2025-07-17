@@ -10,7 +10,7 @@ To use the package, do
 
 ```julia
 using Pkg
-Pkg.add("https://github.com/DanielVandH/ArcPolynomials.jl")
+Pkg.add(url="https://github.com/DanielVandH/ArcPolynomials.jl")
 using ArcPolynomials
 ```
 
