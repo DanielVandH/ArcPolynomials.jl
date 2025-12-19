@@ -16,12 +16,12 @@ import FillArrays: Fill, Ones, Zeros
 import Infinities: ∞
 import ContinuumArrays: affine, grammatrix, grammatrix_layout, transform, grid, plan_transform, basis, ExpansionLayout, weaklaplacian_layout
 import LinearAlgebra: Diagonal, Symmetric, dot, transpose
-import BandedMatrices: BandedMatrix, _BandedMatrix, band
+import BandedMatrices: BandedMatrix, _BandedMatrix, band, bandeddata
 import ClassicalOrthogonalPolynomials: orthogonalityweight, adaptivetransform_ldiv
 import ArrayLayouts: colsupport, ldiv, MemoryLayout
 import BlockBandedMatrices: blockcolsupport
 import AbstractFFTs: Plan
-import LazyBandedMatrices: BlockVec, BlockBroadcastMatrix, unitblocks
+import LazyBandedMatrices: BlockVec, BlockBroadcastMatrix, unitblocks, BlockBroadcastVector
 import IntervalSets: var".."
 import InfiniteLinearAlgebra: pad
 

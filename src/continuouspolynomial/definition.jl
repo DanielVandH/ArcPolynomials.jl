@@ -59,8 +59,8 @@ function getindex(P::PeriodicContinuousPolynomial{0,T}, θ::Number, JR::BlockOne
         θ = -one(T)
     elseif θ > 1 && isapprox(θ, 1, atol=1e-12)
         θ = one(T)
-    end # @inbounds doesn't want to propagate into Ultraspherical in tests
-    vals = @inbounds Legendre{T}()[θ, OneTo(Int(maximum(JR)))]
+    end
+    vals = Legendre{T}()[θ, OneTo(Int(maximum(JR)))]
     nel = length(P.points) - 1
     ret[element:nel:end] .= vals
     return ret
@@ -78,13 +78,13 @@ function getindex(P::PeriodicContinuousPolynomial{1,T}, θ::Number, JR::BlockRan
         θ′ = -one(T)
     elseif θ > 1 && isapprox(θ′, 1, atol=1e-12)
         θ′ = one(T)
-    end # @inbounds doesn't want to propagate into Ultraspherical in tests
+    end
 
     d = Int(maximum(JR))
     ret[Block(1)] .= PeriodicLinearSpline(P.points)[θ, :]
     if d > 1
         JR′ = 3:(d+1)
-        vals = @inbounds Ultraspherical{T}(-one(T) / 2)[θ′, JR′]
+        vals = Ultraspherical{T}(-one(T) / 2)[θ′, JR′]
         nel = length(P.points) - 1
         ret[(element+nel):nel:end] .= vals
     end

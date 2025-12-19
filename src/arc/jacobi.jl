@@ -1,61 +1,60 @@
-struct SemiclassicalJacobiArcJacobiXData{T} <: LazyMatrix{T}
-    PX::AbstractMatrix{T}
-    QX::AbstractMatrix{T}
+struct SemiclassicalJacobiArcJacobiXData{T,A,B} <: LazyMatrix{T}
+    PX::A
+    QX::B
 end
-struct SemiclassicalJacobiArcJacobiYData{T} <: LazyMatrix{T}
-    Φ::AbstractMatrix{T} # P = QΦ 
-    Ψ::AbstractMatrix{T} # y^2Q = PΨ
+SemiclassicalJacobiArcJacobiXData{T}(PX::A, QX::B) where {T,A,B} = SemiclassicalJacobiArcJacobiXData{T,A,B}(PX, QX)
+struct SemiclassicalJacobiArcJacobiYData{T,A,B} <: LazyMatrix{T}
+    Φ::A # P = QΦ
+    Ψ::B # y^2Q = PΨ
 end
+SemiclassicalJacobiArcJacobiYData{T}(Φ::A, Ψ::B) where {T,A,B} = SemiclassicalJacobiArcJacobiYData{T,A,B}(Φ, Ψ)
 size(::SemiclassicalJacobiArcJacobiYData) = (7, ∞)
 size(::SemiclassicalJacobiArcJacobiXData) = (5, ∞)
 function SemiclassicalJacobiArcJacobiXData(R::SemiclassicalJacobiArc{T}) where {T}
-    PX = (R.h - 1) * jacobimatrix(R.P)
-    QX = (R.h - 1) * jacobimatrix(R.Q)
-    return SemiclassicalJacobiArcJacobiXData(PX, QX)
+    PX = (R.h - 1) * jacobimatrix(get_P(R))
+    QX = (R.h - 1) * jacobimatrix(get_Q(R))
+    return SemiclassicalJacobiArcJacobiXData{T}(PX, QX)
 end
 function SemiclassicalJacobiArcJacobiYData(R::SemiclassicalJacobiArc{T}) where {T}
-    Φ = R.Q \ R.P
-    M = Weighted(R.P) \ Weighted(R.Q)
-    return SemiclassicalJacobiArcJacobiYData(Φ, (one(R.h) - R.h)^2 * M)
+    P, Q = get_P(R), get_Q(R)
+    Φ = Q \ P
+    M = Weighted(P) \ Weighted(Q)
+    return SemiclassicalJacobiArcJacobiYData{T}(Φ, (one(R.h) - R.h)^2 * M)
 end
-function getindex(X::SemiclassicalJacobiArcJacobiXData{T}, i::Int, j::Int) where {T}
+function getindex(X::SemiclassicalJacobiArcJacobiXData{T}, i::Int, j::Int)::T where {T}
     @boundscheck checkbounds(Bool, X, i, j) || throw(BoundsError(X, (i, j)))
     i == 2 && return zero(T)
     i == 4 && return zero(T)
     a⁻, b⁻, c⁻ = supdiagonaldata(X.PX), diagonaldata(X.PX), subdiagonaldata(X.PX)
     a⁺, b⁺, c⁺ = supdiagonaldata(X.QX), diagonaldata(X.QX), subdiagonaldata(X.QX)
-    @inbounds begin
-        if j == 1 
-            return i == 3 ? b⁻[1] + 1 : i == 5 ? c⁻[1] : zero(T)
-        elseif j == 2 
-            return i == 3 ? b⁺[1] + 1 : i == 5 ? c⁺[1] : zero(T)
-        elseif isodd(j) 
-            j′ = j ÷ 2
-            return i == 1 ? a⁻[j′] : i == 3 ? b⁻[j′+1] + 1 : i == 5 ? c⁻[j′+1] : zero(T)
-        else # iseven(j) 
-            j′ = j ÷ 2
-            return i == 1 ? a⁺[j′-1] : i == 3 ? b⁺[j′] + 1 : i == 5 ? c⁺[j′] : zero(T)
-        end
+    if j == 1
+        return i == 3 ? b⁻[1] + 1 : i == 5 ? c⁻[1] : zero(T)
+    elseif j == 2
+        return i == 3 ? b⁺[1] + 1 : i == 5 ? c⁺[1] : zero(T)
+    elseif isodd(j)
+        j′ = j ÷ 2
+        return i == 1 ? a⁻[j′] : i == 3 ? b⁻[j′+1] + 1 : i == 5 ? c⁻[j′+1] : zero(T)
+    else # iseven(j) 
+        j′ = j ÷ 2
+        return i == 1 ? a⁺[j′-1] : i == 3 ? b⁺[j′] + 1 : i == 5 ? c⁺[j′] : zero(T)
     end
 end
-function getindex(Y::SemiclassicalJacobiArcJacobiYData{T}, i::Int, j::Int) where {T}
+function getindex(Y::SemiclassicalJacobiArcJacobiYData{T}, i::Int, j::Int)::T where {T}
     @boundscheck checkbounds(Bool, Y, i, j) || throw(BoundsError(Y, (i, j)))
     Φ, Ψ = Y.Φ, Y.Ψ
     iseven(i) && return zero(T)
-    @inbounds begin 
-        if j == 1
-            return i == 5 ? Φ[1, 1] : zero(T)
-        elseif j == 2 
-            return i == 3 ? Ψ[1, 1] : i == 5 ? Ψ[2, 1] : i == 7 ? Ψ[3, 1] : zero(T)
-        elseif j == 3 
-            return i == 3 ? Φ[1, 2] : i == 5 ? Φ[2, 2] : zero(T)
-        elseif iseven(j)
-            j′ = j ÷ 2
-            return i == 3 ? Ψ[j′, j′] : i == 5 ? Ψ[j′+1, j′] : i == 7 ? Ψ[j′+2, j′] : zero(T)
-        else # isodd(j)
-            j′ = j ÷ 2
-            return i == 1 ? Φ[j′-1, j′+1] : i == 3 ? Φ[j′, j′+1] : i == 5 ? Φ[j′+1, j′+1] : zero(T)
-        end
+    if j == 1
+        return i == 5 ? Φ[1, 1] : zero(T)
+    elseif j == 2
+        return i == 3 ? Ψ[1, 1] : i == 5 ? Ψ[2, 1] : i == 7 ? Ψ[3, 1] : zero(T)
+    elseif j == 3
+        return i == 3 ? Φ[1, 2] : i == 5 ? Φ[2, 2] : zero(T)
+    elseif iseven(j)
+        j′ = j ÷ 2
+        return i == 3 ? Ψ[j′, j′] : i == 5 ? Ψ[j′+1, j′] : i == 7 ? Ψ[j′+2, j′] : zero(T)
+    else # isodd(j)
+        j′ = j ÷ 2
+        return i == 1 ? Φ[j′-1, j′+1] : i == 3 ? Φ[j′, j′+1] : i == 5 ? Φ[j′+1, j′+1] : zero(T)
     end
 end
 

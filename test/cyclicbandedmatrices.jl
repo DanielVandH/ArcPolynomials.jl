@@ -14,17 +14,17 @@ const CBM = CBMs.CyclicBandedMatrix
     A = brand(20, 20, 2, 3)
     @test CBMs._maybeextend(A) == A && !(CBMs._maybeextend(A) === A)
     A = brand(20, 20, 0, 0)
-    @test CBMs._maybeextend(A) == BandedMatrix(-1 => zeros(19), 0 => A[band(0)], 1 => zeros(19)) && bandwidths(CBMs._maybeextend(A)) == (1, 1)
+    @test CBMs._maybeextend(A) == BandedMatrix(-1 => zeros(19), 0 => A[BandedMatrices.band(0)], 1 => zeros(19)) && bandwidths(CBMs._maybeextend(A)) == (1, 1)
     A = brand(20, 20, 3, 0)
-    @test CBMs._maybeextend(A) == BandedMatrix(-3 => A[band(-3)], -2 => A[band(-2)], -1 => A[band(-1)], 0 => A[band(0)], 1 => zeros(19)) && bandwidths(CBMs._maybeextend(A)) == (3, 1)
+    @test CBMs._maybeextend(A) == BandedMatrix(-3 => A[BandedMatrices.band(-3)], -2 => A[BandedMatrices.band(-2)], -1 => A[BandedMatrices.band(-1)], 0 => A[BandedMatrices.band(0)], 1 => zeros(19)) && bandwidths(CBMs._maybeextend(A)) == (3, 1)
     A = brand(20, 20, 0, 1)
-    @test CBMs._maybeextend(A) == BandedMatrix(-1 => zeros(19), 0 => A[band(0)], 1 => A[band(1)]) && bandwidths(CBMs._maybeextend(A)) == (1, 1)
+    @test CBMs._maybeextend(A) == BandedMatrix(-1 => zeros(19), 0 => A[BandedMatrices.band(0)], 1 => A[BandedMatrices.band(1)]) && bandwidths(CBMs._maybeextend(A)) == (1, 1)
     A = brand(20, 20, -3, -3)
     @test size(CBMs._maybeextend(A).data) == (3, 20)
     A = brand(20, 20, 3, -6)
     @test size(CBMs._maybeextend(A).data) == (5, 20)
     A = brand(20, 20, 4, -2)
-    @test CBMs._maybeextend(A) == BandedMatrix(-4 => A[band(-4)], -3 => A[band(-3)], -2 => A[band(-2)], -1 => A[band(-1)], 0 => A[band(0)], 1 => zeros(19)) && bandwidths(CBMs._maybeextend(A)) == (4, 1)
+    @test CBMs._maybeextend(A) == BandedMatrix(-4 => A[BandedMatrices.band(-4)], -3 => A[BandedMatrices.band(-3)], -2 => A[BandedMatrices.band(-2)], -1 => A[BandedMatrices.band(-1)], 0 => A[BandedMatrices.band(0)], 1 => zeros(19)) && bandwidths(CBMs._maybeextend(A)) == (4, 1)
     A = brand(2, 2, 0, 1)
     @test CBMs._maybeextend(A) == A && bandwidths(CBMs._maybeextend(A)) == (1, 1)
     A = brand(2, 2, 0, 0)
@@ -85,7 +85,7 @@ end
     B = BandedMatrix(-2 => [0.0], -1 => [0.23722433407530427, 0.08758173278821277], 0 => [0.32713718227154587, 0.36876596676325474, 0.28473466997327074], 1 => [0.23722433407530427, 0.08758173278821277], 2 => [0.0])
     a = 0.06092010379722579
     C = CBM(B, a, a)
-    @test C[1,3]==C[3,1]==a
+    @test C[1, 3] == C[3, 1] == a
     @test C ≈ B + [0 0 a; 0 0 0; a 0 0]
 end
 
@@ -100,6 +100,7 @@ end
     @test CBMs._extended_bpbandwidths(B, 1) == 2
     @test CBMs._extended_bpbandwidths(B, 2) == 3
     @test CBMs.bandedpart(B) == A
+    @test CBMs.bandedpart(B) !== A
 
     A = brand(20, 20, 2, -1)
     a, b = rand(2)
@@ -269,9 +270,9 @@ end
     a, b = rand(2)
     B = CBM(A, a, b)
 
-    @test B[band(0)] == A[band(0)]
-    @test B[band(1)] == A[band(1)]
-    @test B[band(2)] == A[band(2)]
+    @test B[BandedMatrices.band(0)] == A[BandedMatrices.band(0)]
+    @test B[BandedMatrices.band(1)] == A[BandedMatrices.band(1)]
+    @test B[BandedMatrices.band(2)] == A[BandedMatrices.band(2)]
     @test B[2, 3] == A[2, 3]
     @test B[1, end] == a
     @test B[end, 1] == b
@@ -319,8 +320,8 @@ end
     A = brand(3, 3, 1, 0)
     a, b = rand(2)
     B = CBM(A, a, b)
-    B[1, 2] = 10
-    @test B[1, 2] == 10
+    @test_throws ArgumentError B[1, 2] = 10
+    @test B[1, 2] == 0
     B[2, 1] = 20
     @test B[2, 1] == 20
     B[1, 1] = 30
@@ -333,8 +334,8 @@ end
     @test B[1, 3] == 60
     B[3, 1] = 70
     @test B[3, 1] == 70
-    B[2, 3] = 80
-    @test B[2, 3] == 80
+    @test_throws ArgumentError B[2, 3] = 30
+    @test B[2, 3] == 0
     B[3, 2] = 90
     @test B[3, 2] == 90
 end
@@ -344,7 +345,7 @@ end
     a, b = rand(2)
     B = CBM(A, a, b)
 
-    BC = copy(B)
+    BC = Base.copy(B)
     @test !(BC === B)
     @test !(BC.data === B.data)
     @test BC == B
@@ -372,46 +373,51 @@ end
     D = Diagonal(randn(20))
     BD = B * D
     @test BD isa CBM
-    @test BD ≈ Matrix(B) * D
+    @test Matrix(BD) ≈ Matrix(B) * D
     DB = D * B
     @test DB isa CBM
-    @test DB ≈ D * Matrix(B)
+    @test Matrix(DB) ≈ D * Matrix(B)
 
     A = CBM(brand(2, 2, 0, 0), randn(2)...)
     D = Diagonal(randn(2))
     AD = A * D
     @test AD isa CBM
-    @test AD ≈ Matrix(A) * D
+    @test Matrix(AD) ≈ Matrix(A) * D
     DA = D * A
     @test DA isa CBM
-    @test DA ≈ D * Matrix(A)
+    @test Matrix(DA) ≈ D * Matrix(A)
 
     A = CBM(brand(2, 2, 0, 1), randn(2)...)
     D = Diagonal(randn(2))
     AD = A * D
     @test AD isa CBM
-    @test AD ≈ Matrix(A) * D
+    @test Matrix(AD) ≈ Matrix(A) * D
     DA = D * A
     @test DA isa CBM
-    @test DA ≈ D * Matrix(A)
+    @test Matrix(DA) ≈ D * Matrix(A)
 
     A = CBM(brand(2, 2, 1, 0), randn(2)...)
     D = Diagonal(randn(2))
     AD = A * D
     @test AD isa CBM
-    @test AD ≈ Matrix(A) * D
+    @test Matrix(AD) ≈ Matrix(A) * D
     DA = D * A
     @test DA isa CBM
-    @test DA ≈ D * Matrix(A)
+    @test Matrix(DA) ≈ D * Matrix(A)
 
     A = CBM(brand(2, 2, 1, 1), randn(2)...)
     D = Diagonal(randn(2))
     AD = A * D
     @test AD isa CBM
-    @test AD ≈ Matrix(A) * D
+    @test Matrix(AD) ≈ Matrix(A) * D
     DA = D * A
     @test DA isa CBM
-    @test DA ≈ D * Matrix(A)
+    @test Matrix(DA) ≈ D * Matrix(A)
+
+    C = CBMs._CyclicBandedMatrix([0.11780972450961724 1.564373409690294e-309 4.3196e-319 1.4099784044774426; -0.11780972450961724 -0.11780972450961724 -0.11780972450961724 -0.11780972450961724; 0.11780972450961724 0.11780972450961724 0.11780972450961724 0.0], 1, 0, (1, 1))
+    D = Diagonal([0.576616, 0.576616, 0.576616, 0.576616])
+    @test Matrix(C * D) ≈ Matrix(C) * D
+    @test Matrix(D * C) ≈ D * Matrix(C)
 end
 
 function rand_bspd(n, u)
@@ -428,18 +434,18 @@ end
 @testset "Cholesky" begin
     function test_chol(n, u)
         A = rand_spd_cbm(n, u)
-        AA = copy(A)
+        AA = Base.deepcopy(A)
         chol = cholesky!(Symmetric(A))
         L, U = chol
-        @test L * U ≈ AA
+        @test Matrix(L * U) ≈ Matrix(AA)
         @test chol.factors isa AlmostBandedMatrix
         chol = cholesky(Symmetric(AA))
         L, U = chol
-        @test L * U ≈ AA
+        @test Matrix(L * U) ≈ Matrix(AA)
         @test chol.factors isa AlmostBandedMatrix
         _chol = cholesky(Matrix(AA))
         _L, _U = _chol
-        @test _L * _U ≈ AA
+        @test Matrix(_L * _U) ≈ Matrix(AA)
         @test _L ≈ L
         @test _U ≈ U
     end
@@ -456,18 +462,18 @@ end
 @testset "Reverse Cholesky" begin
     function test_revchol(n, u)
         A = rand_spd_cbm(n, u)
-        AA = copy(A)
+        AA = Base.deepcopy(A)
         chol = reversecholesky!(Symmetric(A))
         U, L = chol
-        @test ApplyMatrix(*, U, L) ≈ AA # U * L is an infinite loop or just extremely slow..
+        @test Matrix(ApplyMatrix(*, U, L)) ≈ Matrix(AA) # U * L is an infinite loop or just extremely slow..
         @test chol.factors isa AlmostBandedMatrix
         chol = reversecholesky(Symmetric(AA))
         U, L = chol
-        @test ApplyMatrix(*, U, L) ≈ AA
+        @test Matrix(ApplyMatrix(*, U, L)) ≈ Matrix(AA)
         @test chol.factors isa AlmostBandedMatrix
         _chol = reversecholesky(Matrix(AA))
         _U, _L = _chol
-        @test ApplyMatrix(*, _U, _L) ≈ AA
+        @test Matrix(ApplyMatrix(*, _U, _L)) ≈ Matrix(AA)
         @test _L ≈ L
         @test _U ≈ U
     end
@@ -484,7 +490,7 @@ end
     A = CBM(BandedMatrix(0 => randn(n) .+ 10, 1 => randn(n - 1), -1 => randn(n - 1)), 0.0, 0.0)
     S = Symmetric(A)
     U, L = reversecholesky(S)
-    @test U * L ≈ Matrix(S)
+    @test Matrix(U * L) ≈ Matrix(S)
 end
 
 @testset "Definition" begin
@@ -541,8 +547,8 @@ end
         B2 = brand(100, ℓ, u)
         A, B = CBM(B1, randn(2)...), CBM(B2, randn(2)...)
         @test Base.BroadcastStyle(typeof(A)) == CBMs.CyclicBandedMatrixStyle() == CBMs.CyclicBandedMatrixStyle(Val(2))
-        @test Base.BroadcastStyle(CBMs.CyclicBandedMatrixStyle(), Base.Broadcast.DefaultArrayStyle(Val(2))) == Base.Broadcast.DefaultArrayStyle(Val(2))
-        @test Base.BroadcastStyle(Base.Broadcast.DefaultArrayStyle(Val(2)), CBMs.CyclicBandedMatrixStyle()) == Base.Broadcast.DefaultArrayStyle(Val(2))
+        @test Base.BroadcastStyle(CBMs.CyclicBandedMatrixStyle(), Base.Broadcast.DefaultArrayStyle(Val(2))) == CBMs.CyclicBandedMatrixStyle() # Base.Broadcast.DefaultArrayStyle(Val(2))
+        @test Base.BroadcastStyle(Base.Broadcast.DefaultArrayStyle(Val(2)), CBMs.CyclicBandedMatrixStyle()) == CBMs.CyclicBandedMatrixStyle() # Base.Broadcast.DefaultArrayStyle(Val(2))
         @test -A == -Matrix(A) && -A isa CBM
         @test 2A == 2Matrix(A) && 2A isa CBM
         @test A + B == Matrix(A) + Matrix(B) && A + B isa CBM
@@ -575,46 +581,46 @@ end
     CM1 = CBM(M1, rand(), 0.0)
     CM2 = CBM(M2, rand(), 0.0)
     CA = CBM(A, rand(2)...)
-    @test CA - (CM1 + CM2) ≈ Matrix(CA) - (Matrix(CM1) + Matrix(CM2))
+    @test Matrix(CA - (CM1 + CM2)) ≈ Matrix(CA) - (Matrix(CM1) + Matrix(CM2))
     E = CA - (CM1 + CM2)
     @test E isa CBM && CBMs._bpbandwidths(E) == (1, 1)
 
     A = CBM(brand(10, 10, 0, 1), rand(2)...)
     B = A'
     C = 2B
-    @test C isa CBM && C ≈ 2Matrix(A)' && CBMs._bpbandwidths(C) == (1, 0)
+    @test C isa CBM && Matrix(C) ≈ 2Matrix(A)' && CBMs._bpbandwidths(C) == (1, 0)
 end
 
 @testset "Outer" begin
     B = CBM(brand(10, 10, 0, 0), rand(2)...)
     BB = CBMs.MMᵀ(B)
-    @test BB ≈ Matrix(B) * Matrix(B)'
+    @test Matrix(BB) ≈ Matrix(B) * Matrix(B)'
     @test BB isa CBM && CBMs._bpbandwidths(BB) == (0, 0)
     B = CBM(brand(2, 2, 0, 0), rand(2)...)
     BB = CBMs.MMᵀ(B)
-    @test BB ≈ Matrix(B) * Matrix(B)'
+    @test Matrix(BB) ≈ Matrix(B) * Matrix(B)'
     @test BB isa CBM && CBMs._bpbandwidths(BB) == (0, 0)
 
     B = CBM(brand(10, 10, 1, 0), rand(2)...)
     @test_throws AssertionError CBMs.MMᵀ(B)
     B = CBM(brand(10, 10, 1, 0), rand(), 0.0)
     BB = CBMs.MMᵀ(B)
-    @test BB ≈ Matrix(B) * Matrix(B)'
+    @test Matrix(BB) ≈ Matrix(B) * Matrix(B)'
     @test BB isa CBM && CBMs._bpbandwidths(BB) == (1, 1)
     B = CBM(brand(2, 2, 1, 0), rand(2)...)
     BB = CBMs.MMᵀ(B)
-    @test BB ≈ Matrix(B) * Matrix(B)'
+    @test Matrix(BB) ≈ Matrix(B) * Matrix(B)'
     @test BB isa CBM && CBMs._bpbandwidths(BB) == (0, 0)
 
     B = CBM(brand(10, 10, 0, 1), rand(2)...)
     @test_throws AssertionError CBMs.MMᵀ(B)
     B = CBM(brand(10, 10, 0, 1), 0.0, rand())
     BB = CBMs.MMᵀ(B)
-    @test BB ≈ Matrix(B) * Matrix(B)'
+    @test Matrix(BB) ≈ Matrix(B) * Matrix(B)'
     @test BB isa CBM && CBMs._bpbandwidths(BB) == (1, 1)
     B = CBM(brand(2, 2, 0, 1), rand(2)...)
     BB = CBMs.MMᵀ(B)
-    @test BB ≈ Matrix(B) * Matrix(B)'
+    @test Matrix(BB) ≈ Matrix(B) * Matrix(B)'
     @test BB isa CBM && CBMs._bpbandwidths(BB) == (0, 0)
 
     B = CBM(brand(10, 10, 1, 1), rand(2)...)
@@ -622,57 +628,57 @@ end
 
     B = CBM(brand(3, 3, 1, 0), rand(), 0.0)
     BB = CBMs.MMᵀ(B)
-    @test BB ≈ Matrix(B) * Matrix(B)'
+    @test Matrix(BB) ≈ Matrix(B) * Matrix(B)'
     @test BB isa CBM && CBMs._bpbandwidths(BB) == (1, 1)
 
     B = CBM(brand(3, 3, 0, 1), 0.0, rand())
     BB = CBMs.MMᵀ(B)
-    @test BB ≈ Matrix(B) * Matrix(B)'
+    @test Matrix(BB) ≈ Matrix(B) * Matrix(B)'
     @test BB isa CBM && CBMs._bpbandwidths(BB) == (1, 1)
 end
 
 @testset "MᵀM" begin
     B = CBM(brand(10, 10, 0, 0), rand(2)...)
     BB = CBMs.MᵀM(B)
-    @test BB ≈ Matrix(B)' * Matrix(B)
+    @test Matrix(BB) ≈ Matrix(B)' * Matrix(B)
     @test BB isa CBM && CBMs._bpbandwidths(BB) == (0, 0)
     B = CBM(brand(2, 2, 0, 0), rand(2)...)
     BB = CBMs.MᵀM(B)
-    @test BB ≈ Matrix(B)' * Matrix(B)
+    @test Matrix(BB) ≈ Matrix(B)' * Matrix(B)
     @test BB isa CBM && CBMs._bpbandwidths(BB) == (0, 0)
 
     B = CBM(brand(10, 10, 1, 0), rand(2)...)
     @test_throws AssertionError CBMs.MᵀM(B)
     B = CBM(brand(10, 10, 1, 0), rand(), 0.0)
     BB = CBMs.MᵀM(B)
-    @test BB ≈ Matrix(B)' * Matrix(B)
+    @test Matrix(BB) ≈ Matrix(B)' * Matrix(B)
     @test BB isa CBM && CBMs._bpbandwidths(BB) == (1, 1)
     B = CBM(brand(2, 2, 1, 0), rand(2)...)
     BB = CBMs.MᵀM(B)
-    @test BB ≈ Matrix(B)' * Matrix(B)
+    @test Matrix(BB) ≈ Matrix(B)' * Matrix(B)
     @test BB isa CBM && CBMs._bpbandwidths(BB) == (0, 0)
 
     B = CBM(brand(10, 10, 0, 1), rand(2)...)
     @test_throws AssertionError CBMs.MᵀM(B)
     B = CBM(brand(10, 10, 0, 1), 0.0, rand())
     BB = CBMs.MᵀM(B)
-    @test BB ≈ Matrix(B)' * Matrix(B)
+    @test Matrix(BB) ≈ Matrix(B)' * Matrix(B)
     @test BB isa CBM && CBMs._bpbandwidths(BB) == (1, 1)
     B = CBM(brand(2, 2, 0, 1), rand(2)...)
     BB = CBMs.MᵀM(B)
-    @test BB ≈ Matrix(B)' * Matrix(B)
+    @test Matrix(BB) ≈ Matrix(B)' * Matrix(B)
 
     B = CBM(brand(10, 10, 1, 1), rand(2)...)
     @test_throws ArgumentError CBMs.MᵀM(B)
 
     B = CBM(brand(3, 3, 1, 0), rand(), 0.0)
     BB = CBMs.MᵀM(B)
-    @test BB ≈ Matrix(B)' * Matrix(B)
+    @test Matrix(BB) ≈ Matrix(B)' * Matrix(B)
     @test BB isa CBM && CBMs._bpbandwidths(BB) == (1, 1)
 
     B = CBM(brand(3, 3, 0, 1), 0.0, rand())
     BB = CBMs.MᵀM(B)
-    @test BB ≈ Matrix(B)' * Matrix(B)
+    @test Matrix(BB) ≈ Matrix(B)' * Matrix(B)
     @test BB isa CBM && CBMs._bpbandwidths(BB) == (1, 1)
 end
 
@@ -754,9 +760,9 @@ end
 @testset "mat_sub_MMᵀ!" begin
     A = CBM(brand(10, 10, 0, 0), randn(2)...)
     M = CBM(brand(10, 10, 0, 0), randn(2)...)
-    C = A - M * M'
+    C = Matrix(A) - Matrix(M * M')
     CBMs.mat_sub_MMᵀ!(A, M)
-    @test A ≈ C
+    @test Matrix(A) ≈ C
     expr = @allocations CBMs.mat_sub_MMᵀ!(A, M)
     @test iszero(expr)
     @inferred CBMs.mat_sub_MMᵀ!(A, M)
@@ -765,19 +771,77 @@ end
     M = CBM(brand(10, 10, 1, 0), randn(2)...)
     @test_throws AssertionError CBMs.mat_sub_MMᵀ!(A, M)
     M = CBM(brand(10, 10, 0, 1), 0.0, randn())
-    C = A - M * M'
+    C = Matrix(A) - Matrix(M * M')
     CBMs.mat_sub_MMᵀ!(A, M)
-    @test A ≈ C
+    @test Matrix(A) ≈ C
 
     A = CBM(brand(10, 10, 1, 1), randn(2)...)
     M = CBM(brand(10, 10, 1, 0), rand(), 0.0)
-    C = A - M * M'
+    C = Matrix(A) - Matrix(M * M')
     CBMs.mat_sub_MMᵀ!(A, M)
-    @test A ≈ C
+    @test Matrix(A) ≈ C
 
     A = CBM(brand(2, 2, 0, 0), randn(2)...)
     M = CBM(brand(2, 2, 0, 0), randn(2)...)
-    C = A - M * M'
+    C = Matrix(A) - Matrix(M * M')
     CBMs.mat_sub_MMᵀ!(A, M)
-    @test A ≈ C
+    @test Matrix(A) ≈ C
+
+    A = CBMs._CyclicBandedMatrix([2.4886e-311 1.24396e-311 0.0 0.0
+        -0.0475711 -0.0475711 -0.0475711 -0.0475711
+        3.62943 3.62943 3.62943 3.62943
+        -0.0475711 -0.0475711 -0.0475711 -0.0475711
+        0.0 0.0 6.95277e-310 1.24395e-311], 1, 1, (2, 2))
+    B = CBMs._CyclicBandedMatrix([0.2043122710948313 2.71302462937257e-309 7.4913e-319 2.4452641003327042; -0.2043122710948313 -0.2043122710948313 -0.2043122710948313 -0.2043122710948313; 0.2043122710948313 0.2043122710948313 0.2043122710948313 0.0], 1, 0, (1, 1))
+    C = Matrix(A) - Matrix(B * B')
+    CBMs.mat_sub_MMᵀ!(A, B)
+    @test Matrix(A) ≈ C
+end
+
+@testset "Adjoint fixes" begin
+    for (itr, A) in enumerate((CBM(brand(10, 10, 1, 1), randn(2)...),
+        CBM(brand(10, 10, 1, 0), randn(2)...),
+        CBM(brand(10, 10, 0, 1), randn(2)...)))
+        @test CBM(BandedMatrix(CBMs.bandedpart(A')), A[end, 1], A[1, end]') == A'
+        @test 3A' == 3Matrix(A)'
+        @test Matrix(A' + A') == Matrix(A)' + Matrix(A)'
+        @test Matrix(A' - A') == Matrix(A)' - Matrix(A)'
+        @test Matrix(A + A') == Matrix(A) + Matrix(A)'
+        @test Matrix(A - A') == Matrix(A) - Matrix(A)'
+        @test Matrix(A' + A) == Matrix(A)' + Matrix(A)
+        @test Matrix(A' - A) == Matrix(A)' - Matrix(A)
+        @test 3A' isa CBM
+        @test A' + A' isa Adjoint{<:Any,<:CBM}
+        @test A' + A isa CBM
+        @test A' - A isa CBM
+        @test A + A' isa CBM
+        @test A - A' isa CBM
+        if itr == 1
+            @test colsupport(A', 1) == 1:10
+            @test colsupport(A', 2) == 1:3
+            @test colsupport(A', 10) == 1:10
+            @test rowsupport(A', 1) == 1:10
+            @test rowsupport(A', 2) == 1:3
+            @test rowsupport(A', 10) == 1:10
+        end
+    end
+
+    A = CBM(brand(10, 10, 1, 0), randn(2)...)
+    B = CBM(brand(10, 10, 1, 0), randn(2)...)
+    @test Matrix(A + B) ≈ Matrix(A) + Matrix(B) && A + B isa CBM && CBMs._bpbandwidths(A + B) == (1, 0)
+    B = CBM(brand(10, 10, 0, 1), randn(2)...)
+    @test Matrix(A + B) ≈ Matrix(A) + Matrix(B) && A + B isa CBM && CBMs._bpbandwidths(A + B) == (1, 1)
+    @test Matrix(A + B') ≈ Matrix(A) + Matrix(B)' && A + B' isa CBM && CBMs._bpbandwidths(A + B') == (1, 0)
+    B = CBM(brand(10, 10, 1, 1), randn(2)...)
+    @test Matrix(A + B) ≈ Matrix(A) + Matrix(B) && A + B isa CBM && CBMs._bpbandwidths(A + B) == (1, 1)
+    @test Matrix(A + B') ≈ Matrix(A) + Matrix(B)' && A + B' isa CBM && CBMs._bpbandwidths(A + B') == (1, 1)
+end
+
+@testset "Zeros fixes" begin
+    A = CBM(brand(10, 10, 1, 1), randn(2)...)
+    B = Zeros(10, 10)
+    @test A + B == A && A + B isa CBM
+    @test B + A == A && B + A isa CBM
+    @inferred A + B
+    @inferred B + A
 end

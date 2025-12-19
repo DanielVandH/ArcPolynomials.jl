@@ -203,6 +203,8 @@ end
     @test length(v) == ∞
     @test v[1:2:100] == a[1:50]
     @test v[2:2:100] == b[1:50]
+    @test v[3] == a[2]
+    @test v[4] == b[2]
 end
 
 @testset "Conversion" begin
@@ -288,7 +290,7 @@ end
         c = g.args[2]
         @test axes(c) === (BlockedOneTo(_r:_r:∞),)
         @test c[Block(2)] == c.args[1][:, 2]
-        @test BlockArrays.blockcolsupport(c) == BlockRange(Base.OneTo(size(c.args[1].parent.args[2], 1)))
+        @test BlockArrays.blockcolsupport(c) == BlockRange((size(c.args[1].parent.args[2], 1),))
         fvals = f1.(θ)
         gvals = g[θ]
         @test fvals ≈ gvals

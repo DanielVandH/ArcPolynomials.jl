@@ -8,7 +8,7 @@ import BlockArrays: blockedrange, blocksizes, blockrowstart, AbstractBlockedUnit
 import FillArrays: Fill, AbstractFill, Zeros
 import ..CyclicBandedMatrices: CyclicBandedMatrix, _bpbandwidths, diagonal_subrmul!, diagonal_rinv!, mat_sub_MMᵀ!
 import BandedMatrices: bandwidths, BandedMatrix
-import ArrayLayouts: ArrayLayouts, CNoPivot, cholesky_layout, cholesky!_layout, layout_getindex, MatLdivVec, MatMulMatAdd, muladd!, LayoutVector, AbstractColumnMajor, MatMulVecAdd, _fill_lmul!, SymmetricLayout, layout_replace_in_print_matrix, HermitianLayout, DiagonalLayout, TriangularLayout, symmetriclayout, MemoryLayout, sublayout, sub_materialize, AbstractStridedLayout, triangulardata, AbstractBandedLayout
+import ArrayLayouts: ArrayLayouts, CNoPivot, cholesky_layout, cholesky!_layout, layout_getindex, MatLdivVec, MatMulMatAdd, muladd!, LayoutVector, AbstractColumnMajor, MatMulVecAdd, _fill_lmul!, SymmetricLayout, layout_replace_in_print_matrix, HermitianLayout, DiagonalLayout, TriangularLayout, symmetriclayout, MemoryLayout, sublayout, sub_materialize, sub_materialize_axes, AbstractStridedLayout, triangulardata, AbstractBandedLayout
 import InfiniteArrays: OneToInf
 import BlockBandedMatrices: AbstractBandedBlockBandedMatrix, AbstractBandedBlockBandedLayout, blockbandwidths, subblockbandwidths
 import MatrixFactorizations: ReverseCholesky, reversecholesky, reversecholesky!, reversecholesky_layout, reversecholesky_layout!
@@ -26,6 +26,7 @@ struct InterlacedMatrix{T,M<:AbstractVector,I} <: AbstractBandedBlockBandedMatri
     n::I
     ℓ::Int
     u::Int
+    InterlacedMatrix(D, n, ℓ, u) = new{eltype(D[1]),typeof(D),typeof(n)}(D, n, ℓ, u)
     function InterlacedMatrix(D::AbstractVector)
         T = eltype(D[1])
         ℓ, u = bandwidths(D[1])
@@ -71,9 +72,19 @@ function setindex!(A::InterlacedMatrix, v, k::Int, j::Int)
 end
 axes(A::InterlacedMatrix) = (blockedrange(Fill(length(A.D), A.n)), blockedrange(Fill(length(A.D), A.n)))
 function similar(A::InterlacedMatrix, ::Type{T}=eltype(A), dims::Tuple{Int,Int}=size(A)) where {T}
-    dims == size(A) || throw(ArgumentError("Cannot change size of InterlacedMatrix"))
+    dims == size(A) || throw(ArgumentError(lazy"Cannot change size of InterlacedMatrix, requested $dims but size is $(size(A))"))
     D = similar.(A.D, T)
     return InterlacedMatrix(D)
+end
+
+function sub_materialize_axes(V::SubArray{<:Any,<:Any,<:InterlacedMatrix}, _)
+    Array(V)
+    # In https://github.com/JuliaLinearAlgebra/ArrayLayouts.jl/pull/261, this definition was changed to 
+    # copyto!(similar(V, axes(V)), V)
+    # which causes some issues within this module. They could be fixed, but this is fine as a simple work-around.
+end
+function sub_materialize_axes(V::SubArray{<:Any,<:Any,<:InterlacedMatrix}, ::Tuple{AbstractBlockedUnitRange,AbstractUnitRange})
+    BlockedArray(V) # ambiguity
 end
 
 for adj in (:adjoint, :transpose)
@@ -153,7 +164,10 @@ struct CyclicBBBArrowheadMatrix{T,AA,BB,CC,DD<:InterlacedMatrix} <: AbstractBand
 end
 function CyclicBBBArrowheadMatrix{T}(A::AbstractMatrix, B, C, D) where {T}
     Dlace = InterlacedMatrix(D)
-    return CyclicBBBArrowheadMatrix{T,typeof(A),typeof(B),typeof(C),typeof(Dlace)}(A, B, C, Dlace)
+    return CyclicBBBArrowheadMatrix{T}(A, B, C, Dlace)
+end
+function CyclicBBBArrowheadMatrix{T}(A::AbstractMatrix, B, C, D::InterlacedMatrix) where {T}
+    return CyclicBBBArrowheadMatrix{T,typeof(A),typeof(B),typeof(C),typeof(D)}(A, B, C, D)
 end
 
 _show_typeof(io::IO, B::CyclicBBBArrowheadMatrix{T}) where {T} = print(io, "CyclicBBBArrowheadMatrix{$T}")
@@ -201,6 +215,9 @@ end
 @inline _bandwidths(A::CyclicBandedMatrix) = _bpbandwidths(A)
 @inline _bandwidths(A::Union{<:Adjoint{<:Any,<:CyclicBandedMatrix},<:Transpose{<:Any,<:CyclicBandedMatrix}}) = reverse(_bandwidths(parent(A)))
 function _check_args(A, B, C, D)
+    if typeof(A) isa Matrix
+        @warn "A is a dense matrix."
+    end
     ξ, n = size(A)
     m = length(D)
     μ, v = size(D[1])
@@ -211,15 +228,25 @@ function _check_args(A, B, C, D)
     # We restrict the bandwidths of B and C so that 
     #   - The reverse Cholesky algorithm can be simplified,
     #   - and so that MM' has a cyclic-banded structure with unit corner bandwidths.
+    ctr = 0
     foreach(B) do op
+        ctr += 1
+        if op isa Matrix
+            @warn "Block $ctr of B is a dense matrix."
+        end
         @assert size(op) == (ξ, m)
         λ, μ = _bandwidths(op)
-        @assert (max(λ, 0), max(μ, 0)) == (1, 0) || (max(λ, 0), max(μ, 0)) == (0, 1) || (max(λ, 0), max(μ, 0)) == (0, 0) lazy"Each block of B must be a bidiagonal matrix, but got sub-bandwidths $(λ, μ)."
+        @assert (max(λ, 0), max(μ, 0)) == (1, 0) || (max(λ, 0), max(μ, 0)) == (0, 1) || (max(λ, 0), max(μ, 0)) == (0, 0) lazy"Each block of B must be a bidiagonal matrix, but got sub-bandwidths $(λ, μ) for block $ctr."
     end
+    ctr = 0
     foreach(C) do op
+        ctr += 1
+        if op isa Matrix
+            @warn "Block $ctr of C is a dense matrix."
+        end
         @assert size(op) == (m, n)
         λ, μ = _bandwidths(op)
-        @assert (max(λ, 0), max(μ, 0)) == (1, 0) || (max(λ, 0), max(μ, 0)) == (0, 1) || (max(λ, 0), max(μ, 0)) == (0, 0) lazy"Each block of C must be a bidiagonal matrix, but got sub-bandwidths $(λ, μ)."
+        @assert (max(λ, 0), max(μ, 0)) == (1, 0) || (max(λ, 0), max(μ, 0)) == (0, 1) || (max(λ, 0), max(μ, 0)) == (0, 0) lazy"Each block of C must be a bidiagonal matrix, but got sub-bandwidths $(λ, μ) for block $ctr."
     end
 
     ℓ, u = _bandwidths(D[1])
@@ -260,16 +287,14 @@ cyclicarrowheadlayout(::DiagonalLayout{<:AbstractLazyLayout}) = LazyCyclicArrowh
 symmetriclayout(lay::CyclicArrowheadLayouts) = SymmetricLayout{typeof(lay)}()
 
 MemoryLayout(::Type{<:CyclicBBBArrowheadMatrix{<:Any,<:Any,<:Any,<:Any,<:InterlacedMatrix{<:Any,<:AbstractVector{D}}}}) where {D} = cyclicarrowheadlayout(MemoryLayout(D))
-MemoryLayout(::Type{<:CyclicBBBArrowheadMatrix{<:Any,<:Any,<:Any,<:Any,<:InterlacedMatrix{<:Any,<:AbstractVector{<:BandedMatrix{<:Any, <:AbstractFill{<:Any, 2, <:Tuple{<:OneTo, <:OneToInf}}}}}}}) = LazyCyclicArrowheadLayout()
+MemoryLayout(::Type{<:CyclicBBBArrowheadMatrix{<:Any,<:Any,<:Any,<:Any,<:InterlacedMatrix{<:Any,<:AbstractVector{<:BandedMatrix{<:Any,<:AbstractFill{<:Any,2,<:Tuple{<:OneTo,<:OneToInf}}}}}}}) = LazyCyclicArrowheadLayout()
 MemoryLayout(::Type{<:CyclicBBBArrowheadMatrix{<:Any,<:Any,<:Any,<:Any,<:InterlacedMatrix{<:Any,<:AbstractVector{<:Diagonal{<:Any,<:AbstractFill{<:Any,1,<:Tuple{OneToInf}}}}}}}) = LazyCyclicArrowheadLayout()
 
 function sublayout(::CyclicArrowheadLayouts, ::Type{<:NTuple{2,BlockSlice{<:BlockRange{1,Tuple{OneTo{Int}}}}}})
-    throw("...")
     return CyclicArrowheadLayout()
 end
 
 function sub_materialize(::CyclicArrowheadLayout, V::AbstractMatrix)
-    throw("...")
     KR, JR = parentindices(V)
     P = parent(V)
     M, N = KR.block[end], JR.block[end]
@@ -563,30 +588,62 @@ function to_interlace(D)
     return Dint
 end
 
+function to_cbm(A::V) where {V}
+    a1n, an1 = A[1, end], A[end, 1]
+    A[1, end] = A[end, 1] = zero(eltype(A))
+    return CyclicBandedMatrix(BandedMatrix(sparse(A)), a1n, an1) # BandedMatrix(sparse(A)) because M[Block(1, 1)] creates a matrix with excess bandwidth 
+end
+
+function diagonal_block(M::V, i, j, λ, u) where {V}
+    if !((j < i - λ) || (j > i + u))
+        return M[Block(i, j)]
+    else
+        return BandedMatrix(Zeros{eltype(M)}(blocksizes(M, 1)[i], blocksizes(M, 2)[j]))
+    end
+end
+
 function principal_submatrix(M, K::Block{1})
     # Returns the principal submatrix of M up to block K, returning 
     # the result as another CyclicBBBArrowheadMatrix
     k = Int(K)
-    to_cbm(A) = begin
-        a1n, an1 = A[1, end], A[end, 1]
-        A[1, end] = A[end, 1] = zero(eltype(A))
-        return CyclicBandedMatrix(BandedMatrix(sparse(A)), a1n, an1) # BandedMatrix(sparse(A)) because M[Block(1, 1)] creates a matrix with excess bandwidth 
-    end
     λ, u = blockbandwidths(M)
     A = to_cbm(M[Block(1), Block(1)])
     B = [to_cbm(M[Block(1), Block(i)]) for i in 2:min(u + 1, k)]
     C = [to_cbm(M[Block(i), Block(1)]) for i in 2:min(λ + 1, k)]
 
-    diagonal_block(i, j) = begin
-        if !((j < i - λ) || (j > i + u))
-            return M[Block(i, j)]
-        else
-            return BandedMatrix(Zeros{eltype(M)}(blocksizes(M, 1)[i], blocksizes(M, 2)[j]))
-        end
-    end
-    MD = mortar(diagonal_block.(2:k, (2:k)'), blocksizes(M,1)[2:k], blocksizes(M,2)[2:k])
+    MD = mortar(diagonal_block.((M,), 2:k, (2:k)', λ, u), blocksizes(M, 1)[2:k], blocksizes(M, 2)[2:k])
     D = to_interlace(MD)
     return CyclicBBBArrowheadMatrix(A, B, C, D)
+end
+
+all_aliased(A::AbstractVector) = all(let fir = A[begin]
+        a -> a === fir
+    end, A)
+
+function principal_submatrix(M::CyclicBBBArrowheadMatrix{T}, K::Block{1}) where {T}
+    # Returns the principal submatrix of M up to block K, returning 
+    # the result as another CyclicBBBArrowheadMatrix
+    k = Int(K)
+    λ, u = blockbandwidths(M)
+    A = M.A
+    B = isone(k) ? () : M.B[1:min(u, k - 1)]
+    C = isone(k) ? () : M.C[1:min(λ, k - 1)]
+    if all_aliased(M.D.D)
+        Dvec_fir = M.D.D[1][OneTo(k - 1), OneTo(k - 1)] # __TIME__
+        Dvec = Vector{typeof(Dvec_fir)}(undef, length(M.D.D))
+        Dvec[1] = Dvec_fir
+        for i in 2:length(M.D.D)
+            Dvec[i] = copy(Dvec_fir)
+        end
+    else
+        Dvec = let k = k
+            map(M.D.D) do _D
+                _D[OneTo(k - 1), OneTo(k - 1)] # __TIME__
+            end
+        end
+    end
+    D = InterlacedMatrix(Dvec, k - 1, λ, u)
+    return CyclicBBBArrowheadMatrix{T}(A, B, C, D)
 end
 
 ## SOLVE

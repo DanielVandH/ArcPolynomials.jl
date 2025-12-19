@@ -2,6 +2,8 @@ using Dates
 ct() = Dates.format(now(), "HH:MM:SS")
 @info "[$(ct())]: Loading $(@__FILE__)"
 
+cd(@__DIR__)
+
 using Pkg
 Pkg.activate(@__DIR__)
 Pkg.instantiate()
@@ -12,7 +14,8 @@ using CairoMakie, ArcPolynomials, ContinuumArrays, LazyArrays,
     InfiniteLinearAlgebra, ExponentialUtilities, Test, Dates,
     SemiclassicalOrthogonalPolynomials, FillArrays, OhMyThreads, JLD2,
     OrderedCollections, RecurrenceRelationshipArrays, BandedMatrices, LibGEOS,
-    MatrixFactorizations, BlockBandedMatrices, SparseArrays, ForwardDiff
+    MatrixFactorizations, BlockBandedMatrices, SparseArrays, ForwardDiff, BenchmarkTools,
+    QuadGK, Statistics
 
 using LazyArrays: paddeddata
 using InfiniteLinearAlgebra: pad
@@ -328,6 +331,8 @@ function rate_of_convergence_figures(savefig)
     fig = Figure(fontsize=31)
     ax1 = Axis(fig[1, 1], width=800, height=400, yscale=log10,
         xlabel=L"$ $Degree", ylabel=L"\max|\hat{f}_n|",
+        xticks=(0:10:60, [L"%$s" for s in 0:10:60]),
+        yticks=([1e-15, 1e-10, 1e-5, 1e0, 1e5], [L"10^{-15}", L"10^{-10}", L"10^{-5}", L"10^{0}", L"10^{5}"]),
         title=L"$ $(a) Polynomial degree", titlealign=:left)
     scatter!(ax1, unique(fourier_deg), fourier_maxes, color=:red, markersize=12, marker=:circle)
     scatter!(ax1, unique(legendre_deg), legendre_maxes, color=:green, markersize=12, marker=:rect)
@@ -343,6 +348,8 @@ function rate_of_convergence_figures(savefig)
 
     ax2 = Axis(fig[1, 2], width=800, height=400, yscale=log10,
         xlabel=L"$ $Degrees of freedom", ylabel=L"|\hat{f}_n|",
+        xticks=(0:100:300, [L"%$s" for s in 0:100:300]),
+        yticks=([1e-15, 1e-10, 1e-5, 1e0, 1e5], [L"10^{-15}", L"10^{-10}", L"10^{-5}", L"10^{0}", L"10^{5}"]),
         title=L"$ $(b) Degrees of freedom", titlealign=:left)
     scatter!(ax2, fourier_idx, abs.(vfourier), color=:red, markersize=12, marker=:circle)
     scatter!(ax2, legendre_idx, abs.(vlegendre), color=:green, markersize=12, marker=:rect)
@@ -374,7 +381,7 @@ function screened_poisson(savefig)
     fP, fW = transform.((P0, W0), f)
     np, nw = length.(paddeddata.((fP, fW))) .+ 15M
 
-    ΔP, ΔW = -diff(P)'diff(P), -diff(W)'diff(W)
+    ΔP, ΔW = weaklaplacian(P), weaklaplacian(W)
     MP, MW = P'P, W'W
     MP0, MW0 = P0'P0, W0'W0
     RP, RW = P0 \ P, W0 \ W
@@ -460,7 +467,7 @@ function linear_schrodinger(savefig)
     fF, fP, fW = transform.((F, P, W), f)
     np, nw = length.(paddeddata.((fP, fW))) .+ 2M
 
-    ΔP, ΔW = -diff(P)'diff(P), -diff(W)'diff(W)
+    ΔP, ΔW = weaklaplacian(P), weaklaplacian(W)
     MP, MW = P'P, W'W
     D = F \ diff(F)
 
@@ -474,10 +481,10 @@ function linear_schrodinger(savefig)
     fPn = complex.(collect(fP[1:np]))
     fWn = complex.(collect(fW[1:nw]))
 
-    trange = collect(LinRange(0, 25, 20001))
+    trange = collect(LinRange(0, 15, 5001))
     if !isfile(joinpath(@__DIR__, "schrodinger.jld2"))
         @info "schrodinger.jld2 not found. Computing the matrix exponentials. This may take a very long time."
-        let trange, argP, argW, fPn, fWn, P, W, F
+        let trange = trange, argP = argP, argW = argW, fPn = fPn, fWn = fWn, P = P, W = W, F = F
             @time uP, uW = tmap(1:2) do i
                 arg = (argP, argW)[i]
                 u0 = (fPn, fWn)[i]
@@ -508,21 +515,20 @@ function linear_schrodinger(savefig)
     end
 
     θ = LinRange(-π, π, 250)
-    colors = [:blue, :red, :green, :purple, :orange, :black]
+    colors = [:blue, :red, :green, :purple]
     fig = Figure(fontsize=32)
-    ax1 = Axis(fig[1, 1], width=600, height=300, xlabel=L"\theta", ylabel=L"Re $u(t)$", title=L"Re $u(t)$")
-    ax2 = Axis(fig[1, 2], width=600, height=300, xlabel=L"\theta", ylabel=L"Re $u(t)$", title=L"Re $u(t)$")
-    ax3 = Axis(fig[2, 1], width=600, height=300, xlabel=L"t", ylabel=L"$u$ Drift", title=L"$u$ Drift", yscale=log10)
-    ax4 = Axis(fig[2, 2], width=600, height=300, xlabel=L"t", ylabel=L"$u'$ Drift", title=L"$u'$ Drift", yscale=log10)
-    ax5 = Axis(fig[3, 1], width=600, height=300, xlabel=L"t", ylabel=L"$u''$ Drift", title=L"$u''$ Drift", yscale=log10)
-    ax6 = Axis(fig[3, 2], width=600, height=300, xlabel=L"t", ylabel=L"$u'''$ Drift", title=L"$u'''$ Drift", yscale=log10)
+    ax1 = Axis(fig[1, 1], width=600, height=300, xlabel=L"\theta", ylabel=L"Re $u(t)$", title=L"Re $u(t)$", xticks=([-π, 0, π], [L"-\pi", L"0", L"\pi"]), yticks=([-1, 1, 3], [L"-1", L"1", L"3"]))
+    ax2 = Axis(fig[1, 2], width=600, height=300, xlabel=L"\theta", ylabel=L"Im $u(t)$", title=L"Im $u(t)$", xticks=([-π, 0, π], [L"-\pi", L"0", L"\pi"]), yticks=([-1, 0, 1], [L"-1", L"0", L"1"]))
+    ax3 = Axis(fig[2, 1], width=600, height=300, xlabel=L"t", ylabel=L"$u$ Drift", title=L"$u$ Drift", yscale=log10, xticks=([0, 5, 10, 15], [L"0", L"5", L"10", L"15"]), yticks=([1e-15, 1e-10, 1e-5], [L"10^{-15}", L"10^{-10}", L"10^{-5}"]))
+    ax4 = Axis(fig[2, 2], width=600, height=300, xlabel=L"t", ylabel=L"$u'$ Drift", title=L"$u'$ Drift", yscale=log10, xticks=([0, 5, 10, 15], [L"0", L"5", L"10", L"15"]), yticks=([1e-15, 1e-10, 1e-5], [L"10^{-15}", L"10^{-10}", L"10^{-5}"]))
+    ax5 = Axis(fig[3, 1], width=600, height=300, xlabel=L"t", ylabel=L"$u''$ Drift", title=L"$u''$ Drift", yscale=log10, xticks=([0, 5, 10, 15], [L"0", L"5", L"10", L"15"]), yticks=([1e-15, 1e-10, 1e-5], [L"10^{-15}", L"10^{-10}", L"10^{-5}"]))
+    ax6 = Axis(fig[3, 2], width=600, height=300, xlabel=L"t", ylabel=L"$u'''$ Drift", title=L"$u'''$ Drift", yscale=log10, xticks=([0, 5, 10, 15], [L"0", L"5", L"10", L"15"]), yticks=([1e-15, 1e-10, 1e-5], [L"10^{-15}", L"10^{-10}", L"10^{-5}"]))
     linkxaxes!(ax1, ax2)
     linkaxes!(ax3, ax4, ax5, ax6)
-    hideydecorations!(ax2, grid=false, minorgrid=false, minorticks=false)
     hidexdecorations!.((ax3, ax4), grid=false, minorgrid=false, minorticks=false)
-    ts = 0:5:25
-    tidx = findall(t -> t in ts, trange)
-    for i in 1:6
+    ts = 0:5:15
+    tidx = [findfirst(≥(t), trange) for t in ts]
+    for i in 1:3
         series!(ax1, θ, real(uP[tidx[i]][θ])', solid_color=colors[i], linewidth=4, linestyle=:solid)
         series!(ax1, θ, real(uW[tidx[i]][θ])', solid_color=colors[i], linewidth=4, linestyle=:dash)
         series!(ax1, θ, real(uF[tidx[i]][θ])', solid_color=colors[i], linewidth=4, linestyle=:dashdot)
@@ -555,6 +561,12 @@ function linear_schrodinger(savefig)
     Label(fig[2, 2, Top()], L"$ $(d)", halign=:left)
     Label(fig[3, 1, Top()], L"$ $(e)", halign=:left)
     Label(fig[3, 2, Top()], L"$ $(f)", halign=:left)
+    ylims!(ax1, -3, 5)
+    ylims!(ax2, -1, 2)
+    ylims!(ax3, 1e-16, 1e-4)
+    ylims!(ax4, 1e-16, 1e-4)
+    ylims!(ax5, 1e-16, 1e-4)
+    ylims!(ax6, 1e-16, 1e-4)
     resize_to_layout!(fig)
     display(fig)
     savefig && save(joinpath(@__DIR__, "figures", "schrodinger.pdf"), fig)
@@ -592,7 +604,7 @@ function convection_diffusion(savefig)
     trange = collect(LinRange(0, 2.5, 5001))
     if !isfile(joinpath(@__DIR__, "convection_diffusion.jld2"))
         @info "convection_diffusion.jld2 not found. Computing the matrix exponentials. This may take a very long time."
-        let trange, argP, argW, fPn, fWn, P, W
+        let trange = trange, argP = argP, argW = argW, fPn = fPn, fWn = fWn, P = P, W = W
             @time uP, uW = tmap(1:2) do i
                 arg = (argP, argW)[i]
                 u0 = (fPn, fWn)[i]
@@ -620,9 +632,9 @@ function convection_diffusion(savefig)
     θ = LinRange(-π, π, 250)
     colors = [:blue, :red, :green, :purple, :orange, :black]
     fig = Figure(fontsize=32)
-    ax1 = Axis(fig[1, 1:2], width=1200, height=300, xlabel=L"\theta", ylabel=L"u(t)", title=L"$ $Solution")
-    ax4 = Axis(fig[2, 1], width=600, height=300, xlabel=L"t", ylabel=L"$u''$ Drift", title=L"$u''$ Drift", yscale=log10)
-    ax5 = Axis(fig[2, 2], width=600, height=300, xlabel=L"t", ylabel=L"$u'''$ Drift", title=L"$u'''$ Drift", yscale=log10)
+    ax1 = Axis(fig[1, 1:2], width=1200, height=300, xlabel=L"\theta", ylabel=L"u(t)", title=L"$ $Solution", xticks=([-π, 0, π], [L"-\pi", L"0", L"\pi"]), yticks=([-2, 0, 2], [L"-2", L"0", L"2"]))
+    ax4 = Axis(fig[2, 1], width=600, height=300, xlabel=L"t", ylabel=L"$u''$ Drift", title=L"$u''$ Drift", yscale=log10, xticks=([0, 1, 2], [L"0", L"1", L"2"]), yticks=([1e-15, 1e-10, 1e-5, 1e0], [L"10^{-15}", L"10^{-10}", L"10^{-5}", L"10^{0}"]))
+    ax5 = Axis(fig[2, 2], width=600, height=300, xlabel=L"t", ylabel=L"$u'''$ Drift", title=L"$u'''$ Drift", yscale=log10, xticks=([0, 1, 2], [L"0", L"1", L"2"]), yticks=([1e-12, 1e-9, 1e-6], [L"10^{-12}", L"10^{-9}", L"10^{-6}"]))
     ts = LinRange(trange[1], trange[end], 6)
     tidx = [findfirst(trange .== t) for t in ts]
     series!(ax1, θ, stack([uP[i][θ] for i in tidx])', color=colors, linestyle=:solid, linewidth=4)
@@ -803,6 +815,228 @@ function heat_equation(savefig)
     savefig && save(joinpath(@__DIR__, "figures", "heat_equation_underresolved.pdf"), fig)
 end
 
+function screened_poisson_timings(savefig)
+    function exact_soln_expcos(ω, θ)
+        f1 = let ω = ω, θ = θ
+            x -> (exp(cos(x) + 2π * ω + 2ω * θ) + exp(cos(x) + 2ω * x)) /
+                 (2ω * (exp(ω * (θ + x + 2π)) - exp(ω * (θ + x))))
+        end
+        f2 = let ω = ω, θ = θ
+            x -> -exp(cos(x)) * exp(-ω * θ) * exp(-ω * x) *
+                 (exp(2ω * θ) - exp(2ω * x)) / (2ω)
+        end
+        I1, _ = quadgk(f1, -π, π, rtol=1e-10, atol=1e-10)
+        I2, _ = quadgk(f2, -π, θ, rtol=1e-10, atol=1e-10)
+        return I1 + I2
+    end
+    function build_and_factorise_arc(M, dof)
+        @assert isinteger(dof ÷ M)
+        ω = 3 / 2
+        f = θ -> exp(cos(θ))
+        P = PiecewiseArcPolynomial{1}(M)
+        P0 = PiecewiseArcPolynomial{0}(P)
+        fP = transform(P0, f)
+        ΔP = weaklaplacian(P)
+        MP = P'P
+        MP0 = P0'P0
+        RP = P0 \ P
+        lhsP, rhsP = -ΔP + ω^2 * MP, RP' * MP0 * fP
+        lhsPtc = principal_submatrix(lhsP, Block(dof ÷ M))
+        rhsPtc = BlockedVector(Vector(rhsP[1:dof]), blocksizes(lhsPtc, 1))
+        uPsol_fct = reversecholesky!(Symmetric(lhsPtc))
+        return uPsol_fct, rhsPtc
+    end
+
+    function build_and_factorise_legendre(M, dof)
+        @assert isinteger(dof ÷ M)
+        ω = 3 / 2
+        f = θ -> exp(cos(θ))
+        W = PeriodicContinuousPolynomial{1}(M)
+        W0 = PeriodicContinuousPolynomial{0}(W)
+        fW = transform(W0, f)
+        ΔW = weaklaplacian(W)
+        MW = W'W
+        MW0 = W0'W0
+        RW = W0 \ W
+        lhsW, rhsW = -ΔW + ω^2 * MW, RW' * MW0 * fW
+        lhsWtc = principal_submatrix(lhsW, Block(dof ÷ M))
+        rhsWtc = BlockedVector(Vector(rhsW[1:dof]), blocksizes(lhsWtc, 1))
+        uWsol_fct = reversecholesky!(Symmetric(lhsWtc))
+        return uWsol_fct, rhsWtc
+    end
+    function solve(lhs, rhs)
+        return ldiv!(lhs, rhs)
+    end
+    function time(f::F, args...) where {F}
+        args = deepcopy(args)
+        f(args...)
+        nr = 3
+        times = zeros(nr)
+        for i in 1:nr
+            times[i] = (@timed f(args...)).time
+        end # Some issue with libfftw3.dll was causing segfaults inside BenchmarkTools for some reason
+        return minimum(times)
+    end
+
+    M = (4, 6)
+    if !isfile(joinpath(@__DIR__, "screened_poisson_timings.jld2"))
+        arc_times = []
+        arc_dofs = []
+        arc_errors = []
+        legendre_times = []
+        legendre_dofs = []
+        legendre_errors = []
+
+        for m in M
+            𝛉 = LinRange(-π, π, m + 1)
+            dofs = sort!(unique!(round.(Int, logrange(m, 1e6, 75) ./ m) .* m))
+            for dof in dofs
+                @show dof, length(dofs)
+                # Arc
+                tbuild = time(build_and_factorise_arc, m, dof)
+                lhs, rhs = build_and_factorise_arc(m, dof)
+                tsolve = time(solve, lhs, rhs)
+                soln = solve(lhs, rhs)
+                P = PiecewiseArcPolynomial{1}(𝛉)
+                sol = P * padc(soln, axes(P, 2))
+                θ = LinRange(-π, π, 1000)
+                exact = exact_soln_expcos.(3 / 2, θ)
+                rel2err = 100norm(sol[θ] - exact) / norm(exact)
+                push!(arc_times, (tbuild, tsolve))
+                push!(arc_dofs, dof)
+                push!(arc_errors, rel2err)
+                println("Arc: (m, dof) = ($m, $dof) | tbuild = $tbuild | tsolve = $tsolve| rel2err = $rel2err")
+
+                # Legendre 
+                tbuild = time(build_and_factorise_legendre, m, dof)
+                lhs, rhs = build_and_factorise_legendre(m, dof)
+                tsolve = time(solve, lhs, rhs)
+                soln = solve(lhs, rhs)
+                P = PeriodicContinuousPolynomial{1}(𝛉)
+                sol = P * padc(soln, axes(P, 2))
+                θ = LinRange(-π, π, 1000)
+                exact = exact_soln_expcos.(3 / 2, θ)
+                rel2err = 100norm(sol[θ] - exact) / norm(exact)
+                push!(legendre_times, (tbuild, tsolve))
+                push!(legendre_dofs, dof)
+                push!(legendre_errors, rel2err)
+                println("Legendre: (m, dof) = ($m, $dof) | tbuild = $tbuild | tsolve = $tsolve| rel2err = $rel2err")
+            end
+            push!(arc_times, NaN)
+            push!(arc_dofs, NaN)
+            push!(arc_errors, NaN)
+            push!(legendre_times, NaN)
+            push!(legendre_dofs, NaN)
+            push!(legendre_errors, NaN)
+        end
+        @save joinpath(@__DIR__, "screened_poisson_timings.jld2") arc_times arc_dofs arc_errors legendre_times legendre_dofs legendre_errors
+    else
+        @load joinpath(@__DIR__, "screened_poisson_timings.jld2") arc_times arc_dofs arc_errors legendre_times legendre_dofs legendre_errors
+    end
+
+    first_or_nan(x) = (!(x isa Tuple) && isnan(x)) ? NaN : first(x)
+    last_or_nan(x) = (!(x isa Tuple) && isnan(x)) ? NaN : last(x)
+
+    marker_size = 12
+    sample_points = 2
+    fig = Figure(fontsize=24)
+    naidx = findall(isnan, first_or_nan.(arc_times))
+
+    arc_m4_color = :blue
+    arc_m6_color = :darkgreen
+    legendre_m4_color = :red
+    legendre_m6_color = :black
+
+    arc_m4_marker = :circle
+    arc_m6_marker = :diamond
+    legendre_m4_marker = :utriangle
+    legendre_m6_marker = :rect
+
+    linestyle = :solid
+
+    ax4 = Axis(fig[1, 1], xscale=log10, yscale=log10,
+        xticks=([1e1, 1e2, 1e3, 1e4, 1e5, 1e6], [L"10", L"10^{2}", L"10^{3}", L"10^{4}", L"10^{5}", L"10^{6}"]),
+        yticks=([1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3], [L"10^{-2}", L"10^{-1}", L"10^{0}", L"10^{1}", L"10^{2}", L"10^{3}"]),
+        title=L"$ $(a) Build and factorisation time",
+        xlabel=L"$ $Degrees of freedom",
+        ylabel=L"$ $Computation time [s]",
+        titlealign=:left, width=600, height=400)
+
+    scatterlines!(ax4, arc_dofs[1:sample_points:(naidx[1]-1)], first.(arc_times[1:sample_points:(naidx[1]-1)]),
+        color=arc_m4_color, marker=arc_m4_marker, markersize=marker_size, linestyle=linestyle)
+    scatterlines!(ax4, arc_dofs[(naidx[1]+1):sample_points:(naidx[2]-1)], first.(arc_times[(naidx[1]+1):sample_points:(naidx[2]-1)]),
+        color=arc_m6_color, marker=arc_m6_marker, markersize=marker_size, linestyle=linestyle)
+    scatterlines!(ax4, legendre_dofs[1:sample_points:(naidx[1]-1)], first.(legendre_times[1:sample_points:(naidx[1]-1)]),
+        color=legendre_m4_color, marker=legendre_m4_marker, markersize=marker_size, linestyle=linestyle)
+    scatterlines!(ax4, legendre_dofs[(naidx[1]+1):sample_points:(naidx[2]-1)], first.(legendre_times[(naidx[1]+1):sample_points:(naidx[2]-1)]),
+        color=legendre_m6_color, marker=legendre_m6_marker, markersize=marker_size, linestyle=linestyle)
+
+    ax5 = Axis(fig[1, 2], xscale=log10, yscale=log10,
+        xticks=([1e1, 1e2, 1e3, 1e4, 1e5, 1e6], [L"10", L"10^{2}", L"10^{3}", L"10^{4}", L"10^{5}", L"10^{6}"]),
+        yticks=([1e-6, 1e-5, 1e-4, 1e-3, 1e-2], [L"10^{-6}", L"10^{-5}", L"10^{-4}", L"10^{-3}", L"10^{-2}"]),
+        title=L"$ $(b) Solve time",
+        xlabel=L"$ $Degrees of freedom",
+        ylabel=L"$ $Computation time [s]",
+        titlealign=:left, width=600, height=400)
+
+    scatterlines!(ax5, arc_dofs[1:sample_points:(naidx[1]-1)], last.(arc_times[1:sample_points:(naidx[1]-1)]),
+        color=arc_m4_color, marker=arc_m4_marker, markersize=marker_size, linestyle=linestyle)
+    scatterlines!(ax5, arc_dofs[(naidx[1]+1):sample_points:(naidx[2]-1)], last.(arc_times[(naidx[1]+1):sample_points:(naidx[2]-1)]),
+        color=arc_m6_color, marker=arc_m6_marker, markersize=marker_size, linestyle=linestyle)
+    scatterlines!(ax5, legendre_dofs[1:sample_points:(naidx[1]-1)], last.(legendre_times[1:sample_points:(naidx[1]-1)]),
+        color=legendre_m4_color, marker=legendre_m4_marker, markersize=marker_size, linestyle=linestyle)
+    scatterlines!(ax5, legendre_dofs[(naidx[1]+1):sample_points:(naidx[2]-1)], last.(legendre_times[(naidx[1]+1):sample_points:(naidx[2]-1)]),
+        color=legendre_m6_color, marker=legendre_m6_marker, markersize=marker_size, linestyle=linestyle)
+
+    # Create legend elements for each combination
+    el1 = [LineElement(color=arc_m4_color, linewidth=3), MarkerElement(color=arc_m4_color, marker=arc_m4_marker, markersize=21, strokewidth=2)]
+    el2 = [LineElement(color=arc_m6_color, linewidth=3), MarkerElement(color=arc_m6_color, marker=arc_m6_marker, markersize=21, strokewidth=2)]
+    el3 = [LineElement(color=legendre_m4_color, linewidth=3), MarkerElement(color=legendre_m4_color, marker=legendre_m4_marker, markersize=21, strokewidth=2)]
+    el4 = [LineElement(color=legendre_m6_color, linewidth=3), MarkerElement(color=legendre_m6_color, marker=legendre_m6_marker, markersize=21, strokewidth=2)]
+
+    Legend(fig[2, 1:2],
+        [el1, el2, el3, el4],
+        ["Arc (M = 4)", "Arc (M = 6)", "Legendre (M = 4)", "Legendre (M = 6)"],
+        patchsize=(50, 20), orientation=:horizontal
+    )
+
+    resize_to_layout!(fig)
+    display(fig)
+
+    savefig && save(joinpath(@__DIR__, "figures", "screened_poisson_timings.pdf"), fig)
+end
+
+function eigenvalue_example(savefig)
+    𝛉 = LinRange(-π, π, 4)
+    M = length(𝛉) - 1
+    P = PiecewiseArcPolynomial{1}(𝛉)
+    W = PeriodicContinuousPolynomial{1}(𝛉)
+    ΔP, ΔW = weaklaplacian(P), weaklaplacian(W)
+    MP, MW = P'P, W'W
+
+    KR = Block.(1:4)
+    λP, QP = eigen(Symmetric(-ΔP[KR, KR]), Symmetric(MP[KR, KR]))
+    n = size(QP, 1)
+    λW, QW = eigen(Symmetric(-ΔW[1:n, 1:n]), Symmetric(MW[1:n, 1:n]))
+    x = LinRange(-π, π, 1000)
+    fig = Figure(fontsize=32)
+    clrs5 = [:blue, :orange, :green, :red, :purple, :brown]
+    ax = Axis(fig[1, 1], xticks=([-π, 0, π], [L"-\pi", L"0", L"\pi"]), yticks=([-1 / 2, 0, 1 / 2], [L"-1/2", L"0", L"1/2"]), width=700, height=300, xlabel=L"\theta", ylabel=L"u(\theta)", title=L"$ $(a) Piecewise Arc", titlealign=:left)
+    ax2 = Axis(fig[1, 2], xticks=([-π, 0, π], [L"-\pi", L"0", L"\pi"]), yticks=([-1 / 2, 0, 1 / 2], [L"-1/2", L"0", L"1/2"]), width=700, height=300, xlabel=L"\theta", ylabel=L"u(\theta)", title=L"$ $(b) Integrated Legendre", titlealign=:left)
+    ax3 = Axis(fig[2, 1], xticks=([-π, 0, π], [L"-\pi", L"0", L"\pi"]), yticks=([-1, 0, 1], [L"-1", L"0", L"1"]), width=700, height=300, xlabel=L"\theta", ylabel=L"u'(\theta)", title=L"$ $(c) Piecewise Arc Derivative", titlealign=:left)
+    ax4 = Axis(fig[2, 2], xticks=([-π, 0, π], [L"-\pi", L"0", L"\pi"]), yticks=([-1, 0, 1], [L"-1", L"0", L"1"]), width=700, height=300, xlabel=L"\theta", ylabel=L"u'(\theta)", title=L"$ $(d) Integrated Legendre Derivative", titlealign=:left)
+    for i in 1:4
+        lines!(ax, x, P[x, axes(QP, 1)] * QP[:, i], color=clrs5[i])
+        lines!(ax2, x, W[x, axes(QW, 1)] * QW[:, i], color=clrs5[i])
+        lines!(ax3, x, diff(P)[x, axes(QP, 1)] * QP[:, i], color=clrs5[i])
+        lines!(ax4, x, diff(W)[x, axes(QW, 1)] * QW[:, i], color=clrs5[i])
+    end
+    resize_to_layout!(fig)
+    fig
+
+    savefig && save(joinpath(@__DIR__, "figures", "ccf_eigenvalues.pdf"), fig)
+end
+
 const NAME_FUNC_DICT = OrderedDict(
     "semiclassical_jacobi_figures" => semiclassical_jacobi_figures,
     "arc_polynomial_figures" => arc_polynomial_figures,
@@ -812,6 +1046,8 @@ const NAME_FUNC_DICT = OrderedDict(
     "heat_equation" => heat_equation,
     "linear_schrodinger" => linear_schrodinger,
     "convection_diffusion" => convection_diffusion,
+    "screened_poisson_timings" => screened_poisson_timings,
+    "eigenvalue_example" => eigenvalue_example,
     "save" => x -> nothing
 )
 
@@ -837,3 +1073,5 @@ function (@main)(args)
     @info "[$(ct())]: Done"
     return 0
 end
+
+main(["save"])

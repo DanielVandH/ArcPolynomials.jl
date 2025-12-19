@@ -1,12 +1,4 @@
-struct InterlacedVector{T,A<:AbstractVector{T},B<:AbstractVector{T}} <: LazyVector{T}
-    a::A
-    b::B
-end
-size(::InterlacedVector) = (∞,)
-function getindex(v::InterlacedVector, i::Int)
-    @boundscheck checkbounds(Bool, v, i) || throw(BoundsError(v, i))
-    return isodd(i) ? v.a[i÷2+1] : v.b[i÷2]
-end
+InterlacedVector(a, b) = vec(Vcat(transpose(a), transpose(b)))
 
 function \(P0::PiecewiseArcPolynomial{0,T}, P::PiecewiseArcPolynomial{1,V}) where {T,V}
     F = float(promote_type(T, V))

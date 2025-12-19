@@ -89,8 +89,8 @@ function adaptivetransform_ldiv(Q::PeriodicContinuousPolynomial{1,V}, f::Abstrac
     return pad(append!(cfs, vec(dat[3:end, :]')), axes(Q, 2))
 end
 
-function getindex(f::ApplyQuasiVector{T,typeof(*),<:Tuple{PeriodicContinuousPolynomial,AbstractVector}}, xy::StaticVector{2})::T where {T}
+function getindex(f::ApplyQuasiVector{T,typeof(*),<:Tuple{PeriodicContinuousPolynomial,AbstractVector}}, θ::Number)::T where {T}
     R, c = arguments(f)
     N = blockcolsupport(c)
-    return dot(c[N], R[xy, N])' # ' so that this forms the sum of the individual products instead of a complex inner product when c[N] is complex, noting that R[...] is real.
+    return dot(c[N], R[θ, N])' # ' so that this forms the sum of the individual products instead of a complex inner product when c[N] is complex, noting that R[...] is real.
 end

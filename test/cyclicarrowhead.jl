@@ -11,7 +11,8 @@ using ArcPolynomials,
     LinearAlgebra,
     MatrixFactorizations,
     ArrayLayouts,
-    SparseArrays
+    SparseArrays,
+    Random
 
 const AP = ArcPolynomials
 const PAP = AP.PiecewiseArcPolynomials
@@ -50,7 +51,7 @@ const CyclicBBB = CyclicBBBs.CyclicBBBArrowheadMatrix
     Df[3, 7] = 27.5
     @test Df[3, 7] == 27.5
     @test_throws ArgumentError Df[3, 6] = 27.3
-    @test Df[Block(1,1)] isa Diagonal 
+    @test Df[Block(1, 1)] isa Diagonal
 
     Ds = similar(Df)
     @test typeof(Ds) == typeof(Df)
@@ -324,14 +325,20 @@ end
     𝛉 = [-π; π * (2sort!(rand(8)) .- 1); π]
     P = PiecewiseArcPolynomial{1}(𝛉)
     M = P'P
-    for k in 1:20
+    _M = M[Block.(1:50), Block.(1:50)]
+    for k in 1:40
+        A = CyclicBBBs.principal_submatrix(_M, Block(k))
+        @test A == M[Block.(1:k), Block.(1:k)]
+    end
+    for k in 1:40
         A = CyclicBBBs.principal_submatrix(M, Block(k))
         @test A == M[Block.(1:k), Block.(1:k)]
+        @test all(≤((2, 2)), bandwidths.(A.D.D))
     end
 end
 
 @testset "Reverse Cholesky" begin
-    𝛉 = [-π; π * (2sort!(rand(6)) .- 1); π]
+    𝛉 = [-π, -1.76, -1.58, -1.53, -1.12, -0.8, 0.09, π]
     P = PiecewiseArcPolynomial{1}(𝛉)
     M = P'P
     k = 4
@@ -342,7 +349,7 @@ end
     C = @view K[Block(2):Block(nb), Block(1)]
     D = @view K[Block(2):Block(nb), Block(2):Block(nb)]
     L̃ = reversecholesky(D).L
-    L₀ = reversecholesky(A - B * inv(L̃) * inv(L̃)' * B').L
+    L₀ = reversecholesky(Matrix(A) - Matrix(B) * Matrix(inv(L̃)) * Matrix(inv(L̃)') * Matrix(B')).L
     L = BlockedArray(zeros(eltype(K), size(K)), axes(K))
     L[Block(1), Block(1)] = L₀
     L[Block(2):Block(nb), Block(1)] = inv(L̃)' * B'
@@ -350,94 +357,14 @@ end
     L = LowerTriangular(L)
     @test L' * L ≈ K
 
-    A = K.A
-    B = K.B
-    D = K.D
-    L̃ = reversecholesky(D).factors'
-    invL̃ = BlockedArray(inv(reversecholesky(K[Block(2):Block(nb), Block(2):Block(nb)]).L), axes(D))
-    ℓ = blockbandwidth(K, 1)
-    M = map(1:ℓ) do k
-        Mk = zero(B[k])
-        for b in k:ℓ
-            for col in axes(Mk, 2)
-                for row in colsupport(Mk, col)
-                    for i in axes(Mk, 2)
-                        Mk[row, col] += B[b][row, i] * invL̃[Block(b), Block(k)][i, col]
-                    end
-                end
-            end
-        end
-        Mk
-    end
-    A₀ = A - mapreduce(x -> CBMs.MMᵀ(x), +, M)
-    L₀ = reversecholesky(Symmetric(A₀)).factors'
-    LA = L₀
-    LC = transpose.(M)
-    LB = ()
-    LD = L̃
-    LF = LowerTriangular(CyclicBBB{Float64}(LA, LB, LC, LD.D))
-    @test Matrix(LF') * Matrix(LF) ≈ Matrix(K)
-    @test Matrix(L̃[Block(1, 1)]) * Matrix(M[1])' + Matrix(L̃[Block(2, 1)]) * Matrix(M[2])' ≈ Matrix(B[1])'
-    @test Matrix(L̃[Block(1, 2)]) * Matrix(M[1])' + Matrix(L̃[Block(2, 2)]) * Matrix(M[2])' ≈ Matrix(B[2])'
-
-    n = 4
-    p = 10
-    a0 = randn(n) .+ 10
-    a1 = randn(n - 1)
-    A = CBM(BandedMatrix((0 => a0, 1 => a1, -1 => a1), (n, n)), 1 / 10, 1 / 10)
-    B = [CBM(BandedMatrix((0 => randn(n - 1), -1 => randn(n - 2)), (n, n)), -1.0, 0.0) for _ in 1:6]
-    C = [CBM(BandedMatrix(sparse(CBMs.bandedpart(B'))), B[end, 1], B[1, end]) for B in B]
-    D = map(1:n) do i
-        d0 = randn(p) .+ 25p
-        d1 = randn(p - 1)
-        d2 = randn(p - 2)
-        BandedMatrix((0 => d0, 1 => d1, -1 => d1, 2 => d2, -2 => d2), (10, 10))
-    end
-    K = CyclicBBB{Float64}(A, B, C, D)
-    Kcopy = deepcopy(K)
-    A, B, C, D = K.A, K.B, K.C, K.D
-    nb = length(blockaxes(K, 1))
-    L̃ = reversecholesky(D).factors'
-    invL̃ = BlockedArray(inv(reversecholesky(K[Block(2):Block(nb), Block(2):Block(nb)]).L), axes(D))
-    ℓ = blockbandwidth(K, 1)
-    M = map(1:ℓ) do k
-        Mk = zero(B[k])
-        for b in k:ℓ
-            for col in axes(Mk, 2)
-                for row in colsupport(Mk, col)
-                    for i in axes(Mk, 2)
-                        Mk[row, col] += B[b][row, i] * invL̃[Block(b), Block(k)][i, col]
-                    end
-                end
-            end
-        end
-        Mk
-    end
-    A₀ = A - mapreduce(x -> CBMs.MMᵀ(x), +, M)
-    reversecholesky!(Symmetric(D))
-    @test UpperTriangular(D) * UpperTriangular(D)' ≈ Kcopy.D
-    ℓ = blockbandwidth(K, 1)
-    for b in ℓ:-1:1
-        for j in (b+1):ℓ
-            CBMs.diagonal_subrmul!(B[b], D[Block(b, j)], B[j])
-        end
-        CBMs.diagonal_rinv!(B[b], D[Block(b, b)])
-        CBMs.mat_sub_MMᵀ!(A, B[b])
-    end
-    @test B ≈ M
-    @test A ≈ A₀
-    chol = reversecholesky!(Symmetric(A₀))
-    Kc = CyclicBBB{Float64}(chol.factors, B, (), D.D)
-    @test UpperTriangular(Kc) * UpperTriangular(Kc)' ≈ Kcopy
-
     𝛉 = [-π; π * (2sort!(rand(6)) .- 1); π]
     P = PiecewiseArcPolynomial{1}(𝛉)
     M = P'P
     k = 4
     K = CyclicBBBs.principal_submatrix(M, Block(k))
+    Kcopy = Matrix(K)
     chol = reversecholesky(Symmetric(K))
     @test chol.factors * chol.factors' ≈ K
-    Kcopy = deepcopy(K)
     chol = reversecholesky!(Symmetric(K))
     @test chol.factors * chol.factors' ≈ Kcopy
 
@@ -446,9 +373,9 @@ end
     M = P'P
     k = 8
     K = CyclicBBBs.principal_submatrix(M, Block(k))
+    Kcopy = Matrix(K)
     chol = reversecholesky(Symmetric(K))
     @test chol.factors * chol.factors' ≈ K
-    Kcopy = deepcopy(K)
     chol = reversecholesky!(Symmetric(K))
     @test chol.factors * chol.factors' ≈ Kcopy
 
@@ -457,9 +384,9 @@ end
     M = P'P
     k = 4
     K = CyclicBBBs.principal_submatrix(M, Block(k))
+    Kcopy = Matrix(K)
     chol = reversecholesky(Symmetric(K))
     @test chol.factors * chol.factors' ≈ K
-    Kcopy = deepcopy(K)
     chol = reversecholesky!(Symmetric(K))
     @test chol.factors * chol.factors' ≈ Kcopy
 
@@ -468,9 +395,9 @@ end
     M = P'P
     k = 6
     K = CyclicBBBs.principal_submatrix(M, Block(k))
+    Kcopy = Matrix(K)
     chol = reversecholesky(Symmetric(K))
     @test chol.factors * chol.factors' ≈ K
-    Kcopy = deepcopy(K)
     chol = reversecholesky!(Symmetric(K))
     @test chol.factors * chol.factors' ≈ Kcopy
 
@@ -479,9 +406,9 @@ end
     M = P'P
     k = 8
     K = CyclicBBBs.principal_submatrix(M, Block(k))
+    Kcopy = Matrix(K)
     chol = reversecholesky(Symmetric(K))
     @test chol.factors * chol.factors' ≈ K
-    Kcopy = deepcopy(K)
     chol = reversecholesky!(Symmetric(K))
     @test chol.factors * chol.factors' ≈ Kcopy
 
@@ -518,4 +445,70 @@ end
     chol = reversecholesky!(Symmetric(K))
     ldiv!(chol, b)
     @test Kc * b ≈ bc
+
+    ___A = CBMs._CyclicBandedMatrix(
+        [2.4886e-311 1.24396e-311 0.0 0.0
+            -0.0475711 -0.0475711 -0.0475711 -0.0475711
+            3.62943 3.62943 3.62943 3.62943
+            -0.0475711 -0.0475711 -0.0475711 -0.0475711
+            0.0 0.0 6.95277e-310 1.24395e-311], 1, 1, (2, 2))
+    ___B = (
+        CBMs._CyclicBandedMatrix(
+            [0.5890486225480862 2.7988533303504e-311 2.798853585069e-311 2.7988713686575e-311; 0.5890486225480862 0.5890486225480862 0.5890486225480862 0.5890486225480862; 0.5890486225480862 0.5890486225480862 0.5890486225480862 0.0],
+            1, 0, (1, 1)
+        ),
+        CBMs._CyclicBandedMatrix(
+            [0.11780972450961724 1.564373409690294e-309 4.3196e-319 1.4099784044774426; -0.11780972450961724 -0.11780972450961724 -0.11780972450961724 -0.11780972450961724; 0.11780972450961724 0.11780972450961724 0.11780972450961724 0.0],
+            1, 0, (1, 1)
+        )
+    )
+    ___C = (
+        CBMs._CyclicBandedMatrix(
+            [0.0 0.5890486225480862 0.5890486225480862 0.5890486225480862; 0.5890486225480862 0.5890486225480862 0.5890486225480862 0.5890486225480862; 2.7988533303504e-311 2.798853585069e-311 2.7988713686575e-311 0.5890486225480862],
+            0, 1, (1, 1)
+        ),
+        CBMs._CyclicBandedMatrix(
+            [0.0 0.11780972450961724 0.11780972450961724 0.11780972450961724; -0.11780972450961724 -0.11780972450961724 -0.11780972450961724 -0.11780972450961724; 1.564373409690294e-309 4.3196e-319 1.4099784044774426 0.11780972450961724],
+            0, 1, (1, 1)
+        )
+    )
+    ___D = [
+        BandedMatrices._BandedMatrix(
+            [0.0 0.0 -0.0336599
+                0.0 0.0 0.0
+                1.32007 0.576616 0.386223
+                0.0 0.0 0.0
+                -0.0336599 -0.01122 -0.00509999], 1:3, 2, 2
+        ),
+        BandedMatrices._BandedMatrix(
+            [0.0 0.0 -0.0336599
+                0.0 0.0 0.0
+                1.32007 0.576616 0.386223
+                0.0 0.0 0.0
+                -0.0336599 -0.01122 -0.00509999], 1:3, 2, 2),
+        BandedMatrices._BandedMatrix(
+            [0.0 0.0 -0.0336599
+                0.0 0.0 0.0
+                1.32007 0.576616 0.386223
+                0.0 0.0 0.0
+                -0.0336599 -0.01122 -0.00509999], 1:3, 2, 2),
+        BandedMatrices._BandedMatrix(
+            [0.0 0.0 -0.0336599
+                0.0 0.0 0.0
+                1.32007 0.576616 0.386223
+                0.0 0.0 0.0
+                -0.0336599 -0.01122 -0.00509999], 1:3, 2, 2)
+    ]
+    S = Symmetric(CyclicBBB(___A, ___B, ___C, ___D))
+    chol = reversecholesky(S)
+    @test chol.factors * chol.factors' ≈ S
+    _S = deepcopy(S)
+    chol = reversecholesky!(S)
+    @test chol.factors * chol.factors' ≈ _S
+    b = rand(size(S, 2))
+    bc = copy(b)
+    __S = deepcopy(_S)
+    chol = reversecholesky!(_S)
+    ldiv!(chol, b)
+    @test Matrix(__S) * b ≈ bc
 end

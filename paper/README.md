@@ -10,6 +10,8 @@ The code is given in `main.jl`. This script defines all the functions that produ
 - `"heat_equation"`: Include this argument to execute the results for the heat equation example.
 - `"linear_schrodinger"`: Include this argument to execute the results for the linear Schrödinger equation example.
 - `"convection_diffusion"`: Include this argument to execute the results for the convection-diffusion equation example.
+- `"screened_poisson_timings"`: Include this argument to execute the timing results for the screened Poisson example.
+- `"eigenvalue_example"`: Include this argument to execute the eigenvalue problem example.
 
 If `args` is empty or `["save"]`, then all the functions will be executed (i.e. all the differential equation examples and the figure examples).
 
