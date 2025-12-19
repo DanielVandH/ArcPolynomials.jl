@@ -1073,5 +1073,3 @@ function (@main)(args)
     @info "[$(ct())]: Done"
     return 0
 end
-
-main(["save"])
