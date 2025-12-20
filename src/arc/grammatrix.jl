@@ -8,8 +8,8 @@ function getindex(M::SemiclassicalJacobiArcGrammatrixData, i::Int)
     return isodd(i) ? M.PG : M.QG
 end
 function SemiclassicalJacobiArcGrammatrixData(R::SemiclassicalJacobiArc{T}) where {T}
-    PG = 2sum(orthogonalityweight(R.P))
-    QG = 2(1-R.h)^2*sum(orthogonalityweight(R.Q))
+    PG = 2sum(orthogonalityweight(get_P(R)))
+    QG = 2(1-R.h)^2*sum(orthogonalityweight(get_Q(R)))
     return SemiclassicalJacobiArcGrammatrixData(PG, QG)
 end
 

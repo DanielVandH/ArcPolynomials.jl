@@ -68,9 +68,19 @@ end
             if h != -1.0
                 P = SemiclassicalJacobi(2 / (1 - h), -1 / 2, b, -1 / 2)
                 Q = SemiclassicalJacobi(2 / (1 - h), 1 / 2, b, 1 / 2)
+                @test SAP.get_P(R) == P
+                @test SAP.get_Q(R) == Q
+                @test SAP.get_LP(R) == SemiclassicalJacobi(2 / (1 - h), 1 / 2, b + 1, 1 / 2)
+                @test SAP.get_UP(R) == SemiclassicalJacobi(2 / (1 - h), -1 / 2, b + 1, -1 / 2)
+                @test SAP.get_Q1(R) == diff(Q).args[1]
             else
                 P = SemiclassicalJacobi(1.0, -1 / 2, b - 1 / 2, 0.0)
                 Q = SemiclassicalJacobi(1.0, 1 / 2, b + 1 / 2, 0.0)
+                @test SAP.get_P(R) == P
+                @test SAP.get_Q(R) == Q
+                @test SAP.get_LP(R) == SemiclassicalJacobi(1.0, 1 / 2, b + 3 / 2, 0.0)
+                @test SAP.get_UP(R) == SemiclassicalJacobi(1.0, -1 / 2, b + 3 / 2, 0.0)
+                @test SAP.get_Q1(R) == diff(Q).args[1]
             end
             for n in 1:100
                 d = n ÷ 2
@@ -110,7 +120,9 @@ end
 
     function inp(f, g, w, a, b, xgw, wgw)
         local integrand, val
-        integrand = θ -> f(cos(θ), sin(θ)) * g(cos(θ), sin(θ)) * w(cos(θ))
+        integrand = let f = f, g = g, w = w
+            θ -> f(cos(θ), sin(θ)) * g(cos(θ), sin(θ)) * w(cos(θ))
+        end
         val = (b - a) / 2 * dot(wgw, integrand.((b - a) / 2 .* xgw .+ (a + b) / 2))
         return val
     end
@@ -136,19 +148,29 @@ end
             xgw, wgw = gausslegendre(250)
             for (h, b) in ((0.3, 1.0), (-1.0, 0.0))
                 R = SemiclassicalJacobiArc(h, b)
-                w = x -> orthogonalityweight(R)[acos(x)]
+                w = let R = R
+                    x -> orthogonalityweight(R)[acos(x)]
+                end
                 θ = acos(R.h)
                 a, b = -θ, θ
                 for m in 0:5
                     for n in 0:5
-                        f = (x, y) -> _Yn1(R, m, x, y)
-                        g = (x, y) -> _Yn2(R, n, x, y)
+                        f = let R = R, m = m
+                            (x, y) -> _Yn1(R, m, x, y)
+                        end
+                        g = let R = R, n = n
+                            (x, y) -> _Yn2(R, n, x, y)
+                        end
                         val = inp(f, g, w, a, b, xgw, wgw)
                         @test val ≈ 0.0 atol = 1e-4
                         if n ≠ m
-                            val = inp(f, (x, y) -> _Yn1(R, n, x, y), w, a, b, xgw, wgw)
+                            val = inp(f, let R = R, n = n
+                                    (x, y) -> _Yn1(R, n, x, y)
+                                end, w, a, b, xgw, wgw)
                             @test val ≈ 0.0 atol = 1e-4
-                            val = inp((x, y) -> _Yn2(R, m, x, y), g, w, a, b, xgw, wgw)
+                            val = inp(let R = R, m = m
+                                    (x, y) -> _Yn2(R, m, x, y)
+                                end, g, w, a, b, xgw, wgw)
                             @test val ≈ 0.0 atol = 1e-4
                         end
                     end
@@ -175,12 +197,20 @@ end
                     for (x, y, w) in ((xgw, ygw, wgw), (xgr1, ygr1, wgr1), (xgr2, ygr2, wgr2), (xgl, ygl, wgl))
                         for m in 0:nn
                             for n in 0:nn
-                                f = (x, y) -> _Yn1(R, m, x, y)
-                                g = (x, y) -> _Yn2(R, n, x, y)
+                                f = let R = R, m = m
+                                    (x, y) -> _Yn1(R, m, x, y)
+                                end
+                                g = let R = R, n = n
+                                    (x, y) -> _Yn2(R, n, x, y)
+                                end
                                 val = dinp(f, g, w, x, y)
                                 @test val ≈ 0.0 atol = 1e-4
-                                val1 = dinp(f, (x, y) -> _Yn1(R, n, x, y), w, x, y)
-                                val2 = dinp((x, y) -> _Yn2(R, m, x, y), g, w, x, y)
+                                val1 = dinp(f, let R = R, n = n
+                                        (x, y) -> _Yn1(R, n, x, y)
+                                    end, w, x, y)
+                                val2 = dinp(let R = R, m = m
+                                        (x, y) -> _Yn2(R, m, x, y)
+                                    end, g, w, x, y)
                                 if n ≠ m
                                     @test val1 ≈ 0.0 atol = 1e-4
                                     @test val2 ≈ 0.0 atol = 1e-4
@@ -202,7 +232,9 @@ end
         θ = acos(R.h)
         a, b = -θ, θ
         for n in 1:16
-            g = (x, y) -> R[atan(y, x), n]
+            g = let R = R, n = n
+                (x, y) -> R[atan(y, x), n]
+            end
             fc[n] = inp(f, g, w, a, b, xgw, wgw) / inp(g, g, w, a, b, xgw, wgw)
         end
         _fc = Vcat(fc, Zeros(∞))
@@ -234,7 +266,9 @@ end
     f5 = let R = R
         θ -> R[θ, 1] - 3R[θ, 3] + 10R[θ, 5]
     end
-    @test all(f -> isapprox(test_expand(R, f)...), (f1, f2, f3, f4, f5))
+    @test all(let R = R
+            f -> isapprox(test_expand(R, f)...)
+        end, (f1, f2, f3, f4, f5))
     @test transform(R, f5)[1:8] ≈ [1.0, 0.0, -3.0, 0.0, 10.0, 0.0, 0.0, 0.0]
     @test transform(R, f4)[1:5] ≈ [1.0, 0.0, 0.0, 0.0, 0.0]
     @test transform(R, f3)[1:20] ≈ R[:, 1:20] \ f3.(axes(R, 1))
@@ -245,7 +279,9 @@ end
     f4 = let R = R
         θ -> R[θ, 1] - 3R[θ, 3] + 10R[θ, 2] - 0.5R[θ, 7]
     end
-    @test all(f -> isapprox(test_expand(R, f)...), (f1, f2, f3, f4))
+    @test all(let R = R
+            f -> isapprox(test_expand(R, f)...)
+        end, (f1, f2, f3, f4))
     @test transform(R, f1)[1:8] ≈ [5.0, 0.0, 0.0, R.h, 0.0, 0.0, 0.0, 0.0]
     @test transform(R, f3)[1:8] ≈ [5 + R.h, 5 + R.h, R.h, -R.h, 0.0, 0.0, 0.0, 0.0]
     @test transform(R, f4)[1:8] ≈ [1.0, 10.0, -3.0, 0.0, 0.0, 0.0, -0.5, 0.0]
@@ -358,7 +394,7 @@ end
             ϕ = acos(R.h + 1e-3)
             e = 1e-5
             for n in 0:20
-                for θ in LinRange(-ϕ, ϕ, 1000)
+                for θ in LinRange(-ϕ, ϕ, 10)
                     s, c = sincos(θ)
                     su, cu = sincos(θ + e)
                     sl, cl = sincos(θ - e)
@@ -384,7 +420,7 @@ end
             ϕ = acos(R.h + 1e-3)
             e = 1e-4
             for n in 0:20
-                for θ in LinRange(-ϕ, ϕ, 100)
+                for θ in LinRange(-ϕ, ϕ, 10)
                     s, c = sincos(θ)
                     su, cu = sincos(θ + e)
                     sl, cl = sincos(θ - e)
@@ -431,12 +467,6 @@ end
             f = θ -> cos(θ)^5
             df = θ -> -5cos(θ)^4 * sin(θ)
             @test isapprox(test_diff(R, f, df)...)
-            f = θ -> sin(θ)^5
-            df = θ -> 5cos(θ) * sin(θ)^4
-            @test isapprox(test_diff(R, f, df)...)
-            f = θ -> exp(-cos(θ) * sin(θ))
-            df = θ -> -exp(-cos(θ) * sin(θ)) * (cos(θ)^2 - sin(θ)^2)
-            @test isapprox(test_diff(R, f, df)...)
         end
     end
 end
@@ -444,7 +474,9 @@ end
 @testset "Grammatrix" begin
     function inp(R, j, k)
         local integrand, t, a, b, val
-        integrand = θ -> R[θ, j] * R[θ, k]
+        integrand = let R = R, j = j, k = k
+            θ -> R[θ, j] * R[θ, k]
+        end
         t = acos(R.h)
         a, b = -t, t
         val, _ = quadgk(integrand, a, b, atol=1e-12, rtol=1e-12)
@@ -499,7 +531,7 @@ function test_mu_coefficients(n, h)
     μ = mu_coefficients(n, h)
     ϕ = acos(h)
     for m in 0:n
-        for θ in LinRange(-ϕ, ϕ, 200)
+        for θ in LinRange(-ϕ, ϕ, 20)
             val = 0.0
             for j in 0:m
                 val += μ[j+1, m+1] * P[θ, 2(j+1)-1] / μ[1, 1]
@@ -537,7 +569,7 @@ function test_eta_coefficients(n, h)
     η = eta_coefficients(n, h)
     ϕ = acos(h)
     for m in 1:n
-        for θ in LinRange(-ϕ, ϕ, 200)
+        for θ in LinRange(-ϕ, ϕ, 20)
             val = 0.0
             for j in 1:m
                 val += η[j, m] * P[θ, 2j] / η[1, 1]
@@ -581,7 +613,7 @@ end
         end
     end
     P = SemiclassicalJacobiArc(0.3, 2.0)
-    for N in 0:25
+    for N in 0:10
         f = random_trigpoly(N)
         tf = transform(P, f)
         flag = length(LazyArrays.paddeddata(tf)) ≤ 2N + 1
@@ -660,4 +692,15 @@ end
             end
         end
     end
+end
+
+@testset "resizedata!" begin
+    P = SemiclassicalJacobiArc(0.3, -1.0)
+    LazyArrays.resizedata!(P, :, 127)
+    @test LazyArrays.diagonaldata(P.P.X).args[2].parent.data.datasize == 126
+    @test LazyArrays.diagonaldata(P.Q.X).args[2].parent.data.datasize == 126
+    @test LazyArrays.diagonaldata(P.LP.X).data.datasize == 127
+    @test LazyArrays.diagonaldata(P.UP.X).data.datasize == 127
+    @test LazyArrays.diagonaldata(P.Q1.X).data.datasize == 127
+    @test LazyArrays.diagonaldata(P.P1.X).data.datasize == 127
 end

@@ -10,61 +10,49 @@ The code is given in `main.jl`. This script defines all the functions that produ
 - `"heat_equation"`: Include this argument to execute the results for the heat equation example.
 - `"linear_schrodinger"`: Include this argument to execute the results for the linear Schrödinger equation example.
 - `"convection_diffusion"`: Include this argument to execute the results for the convection-diffusion equation example.
+- `"screened_poisson_timings"`: Include this argument to execute the timing results for the screened Poisson example.
+- `"eigenvalue_example"`: Include this argument to execute the eigenvalue problem example.
 
 If `args` is empty or `["save"]`, then all the functions will be executed (i.e. all the differential equation examples and the figure examples).
 
 # Running the code
 
-The steps that follow assume you are in the `paper` directory and on Julia 1.11, and are given only for Windows. The first way to run the code is to simply do
+The steps that follow assume you are in the `paper` directory and on Julia 1.12, and are given only for Windows. The first way to run the code is to simply do
 
 ```julia
-PS C:\Users\User\.julia\dev\ArcPolynomials\paper> julia
-               _
-   _       _ _(_)_     |  Documentation: https://docs.julialang.org
-  (_)     | (_) (_)    |
-   _ _   _| |_  __ _   |  Type "?" for help, "]?" for Pkg help.
-  | | | | | | |/ _` |  |
-  | | |_| | | | (_| |  |  Version 1.11.5 (2025-04-14)
- _/ |\__'_|_|_|\__'_|  |  Official https://julialang.org/ release
-|__/                   |
-
-julia> include("main.jl")
-[ Info: [13:34:58]: Loading C:\Users\User\.julia\dev\ArcPolynomials\paper\main.jl
-  Activating project at `C:\Users\User\.julia\dev\ArcPolynomials\paper`
-main (generic function with 1 method)
-
-julia> main([])
-[ Info: [13:36:24]: Validating arguments
-[ Info: [13:36:29]: Running semiclassical jacobi figures
-[ Info: [13:36:57]: Running arc polynomial figures
-[ Info: [13:36:58]: Running hat function figures
-[ Info: [13:37:00]: Running rate of convergence figures
-[ Info: [13:37:21]: Running screened poisson
-[ Info: [13:38:11]: Running heat equation
+PS \ArcPolynomials\paper> julia main.jl 
+[ Info: [23:35:07]: Loading \ArcPolynomials\paper\main.jl
+  Activating project at `\ArcPolynomials\paper`
+[ Info: [23:37:10]: Validating arguments
+[ Info: [23:37:16]: Running semiclassical jacobi figures
+[ Info: [23:37:54]: Running arc polynomial figures
+[ Info: [23:37:56]: Running hat function figures
+[ Info: [23:38:00]: Running rate of convergence figures
+[ Info: [23:38:24]: Running screened poisson
+[ Info: [23:39:16]: Running heat equation
 [ Info: Loading heat_equation_resolved.jld2
 [ Info: Loading heat_equation_underresolved.jld2
-[ Info: [13:42:26]: Running linear schrodinger
+[ Info: [23:40:13]: Running linear schrodinger
 [ Info: Loading schrodinger.jld2
-[ Info: [13:51:21]: Running convection diffusion
+[ Info: [23:40:35]: Running convection diffusion
 [ Info: Loading convection_diffusion.jld2
-[ Info: [14:01:17]: Done
-0
-
-julia> 
+[ Info: [23:41:00]: Running screened poisson timings
+[ Info: [23:41:06]: Running eigenvalue example
+[ Info: [23:41:11]: Done
 ```
 
-Alternatively, you can run the code directly from the command line without first entering the Julia REPL. In this form, the `args` are passed as command line arguments. For example, to run the code with all the figures saved and only with the linear Schrödinger and screened Poisson examples, you would run the following command (the equivalent in the first example above would be `main(["save", "linear_schrodinger", "screened_poisson"])`):
+To run the code with all the figures saved and only with the linear Schrödinger and screened Poisson examples, you would run the following command
 
 ```julia
-PS C:\Users\.julia\dev\ArcPolynomials\paper> julia main.jl save linear_schrodinger screened_poisson
-[ Info: [13:22:53]: Loading C:\Users\User\.julia\dev\ArcPolynomials\paper\main.jl
-  Activating project at `C:\Users\User\.julia\dev\ArcPolynomials\paper`
-[ Info: [13:23:18]: Validating arguments
-[ Info: [13:23:29]: Running screened poisson
-[ Info: [13:24:45]: Running linear schrodinger
+PS \ArcPolynomials\paper> julia main.jl save linear_schrodinger screened_poisson
+[ Info: [23:43:55]: Loading \ArcPolynomials\paper\main.jl
+  Activating project at `\ArcPolynomials\paper`
+[ Info: [23:44:22]: Validating arguments
+[ Info: [23:44:36]: Running screened poisson
+[ Info: [23:46:11]: Running linear schrodinger
 [ Info: Loading schrodinger.jld2
-[ Info: [13:33:55]: Done
-PS C:\Users\User\.julia\dev\ArcPolynomials\paper> 
+[ Info: [23:46:44]: Done
+PS \ArcPolynomials\paper> 
 ```
 
 This folder also includes `.jld2` files that save some expensive computations from the examples. If you want to regenerate these files, you can delete them and rerun the code.

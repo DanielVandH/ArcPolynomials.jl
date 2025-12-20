@@ -4,7 +4,7 @@ function grid(R::SemiclassicalJacobiArc{T}, n::Int) where {T}
         R0 = SemiclassicalJacobiArc(zero(T), R)
         return grid(R0, n)
     else
-        t, _ = gaussradau(R.P, n - 1, zero(T))
+        t, _ = gaussradau(get_P(R), n - 1, zero(T))
         s = R.h - 1
         θ = Vector{T}(undef, 2n - 1)
         θ[1] = zero(T)
@@ -42,7 +42,7 @@ function plan_transform(R::SemiclassicalJacobiArc{T}, (n,)::Tuple{Int}, dims::In
         C = (R0\R)[1:(2n-1), 1:(2n-1)] # doing view means we have to define strides() for some reason, which just leads to "conversion to pointer not defined for SemiclassicalJacobiArcConversionData{Float64}"
         return ArcPlan(C \ P.X, n, dims)
     else
-        t, w = gaussradau(R.P, n - 1, zero(T))
+        t, w = gaussradau(get_P(R), n - 1, zero(T))
         s = R.h - 1
         P = zeros(T, 2n - 1, 2n - 1)
         N = zeros(T, 2n - 1)

@@ -14,13 +14,14 @@ import Infinities: ∞
 import BlockArrays: blockedrange, BlockRange, mortar, block, blockindex, Block, findblock, findblockindex, BlockIndex, BlockedArray
 import HarmonicOrthogonalPolynomials: BlockOneTo
 import ContinuumArrays: grammatrix_layout, grammatrix, grid, affine, plan_transform, checkpoints, InvPlan, basis, ExpansionLayout, weaklaplacian_layout
-import LinearAlgebra: Symmetric, Diagonal, transpose
+import LinearAlgebra: Symmetric, Diagonal, transpose, dot
 import BandedMatrices: _BandedMatrix, band, BandedMatrix
 import LazyArrays: Vcat, paddeddata, arguments, Hcat
 import AbstractFFTs: Plan
 import LazyBandedMatrices: BlockVec, BlockBroadcastMatrix, unitblocks
 import IntervalSets: var".."
 import InfiniteLinearAlgebra: pad
+import BlockBandedMatrices: blockcolsupport
 import ArrayLayouts: ldiv, colsupport 
 import StaticArrays: StaticVector
 

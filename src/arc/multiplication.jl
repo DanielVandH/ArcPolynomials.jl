@@ -3,8 +3,8 @@ function multiplication_blocks(a::ApplyQuasiVector{T,typeof(*),<:Tuple{<:Semicla
     𝐚data = paddeddata(𝐚)
     𝐚₂ = 𝐚data[1:2:end]
     𝐚₁ = 𝐚data[2:2:end]
-    P⁻ = P.P
-    P⁺ = P.Q
+    P⁻ = get_P(P)
+    P⁺ = get_Q(P)
     J⁻ = jacobimatrix(P⁻)
     J⁺ = jacobimatrix(P⁺)
     b1⁻ = Clenshaw(𝐚₁, recurrencecoefficients(P⁺)..., J⁻, _p0(P⁺))
@@ -86,7 +86,7 @@ end
     @boundscheck checkbounds(Bool, J, i, j) || throw(BoundsError(J, (i, j)))
     ℓ, u = bandwidths(J)
     if -ℓ ≤ j - i ≤ u
-        return @inbounds inbands_getindex(J, i, j)
+        return inbands_getindex(J, i, j)
     else
         return zero(T)
     end
